@@ -107,12 +107,16 @@ You MUST change the paths in these files:
 **WebConfig.java**
 - Update the path in `addResourceHandlers()` to match the above
 
+---
+## 4. Email Configuration
+To enable email verification, configure the email settings in `application.yml`:
+
+
+
+
 ## 👨‍💻 Author
-
-**ChatEase** is developed and maintained by **[Dabin Tang]**.
-
-* **GitHub**: https://github.com/dabint2003
+* **GitHub**: https://github.com/dabin-tang
 * **Email**: [dabint2003@gamil.com]
-* 
+
 If you like this project, please give it a **Star** ⭐️!
 
