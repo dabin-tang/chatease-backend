@@ -1,0 +1,73 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: ChatEase
+
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/chatease?useSSL=false&serverTimezone=UTC
+    username: root
+    password: #YourPasswordHere
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 1
+          max-wait: 1000ms
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+
+  jackson:
+    default-property-inclusion: non_null
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: #your gmail address
+    password:  #your gmail app password
+    protocol: smtp
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+jwt:
+  secret: "U3VwZXJTZWN1cmVKYXd0U2VjcmV0Rm9yQ2hhdEVhc2UyMDI0KioqMTIzNDU2Nzg5MDE="
+  expiration-time: 86400000  # 1 day
+
+#redisson:
+#  config: |
+#    singleServerConfig:
+#      address: "redis://127.0.0.1:6379"
+#      password: null
+#      database: 0
+#      connectionMinimumIdleSize: 5
+#      connectionPoolSize: 10
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  sw-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+
+logging:
+  level:
+    com.dbt: debug
+    org.hibernate.orm.connections.pooling: error
