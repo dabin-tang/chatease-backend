@@ -1,4 +1,4 @@
-# ChatEase - High-Performance Instant Messaging Backend
+# ChatEase - Instant Messaging Backend
 
 ## Introduction
 ChatEase is an Instant Messaging (IM) backend system built with **Spring Boot 3** and **WebSocket**.
@@ -8,7 +8,7 @@ It supports one-on-one chat, group chat, a complete admin dashboard, multimedia 
 
 ### Core Frameworks
 * **Java**: JDK 17
-* **Spring Boot 3.5.6**: Core container and MVC framework
+* **Spring Boot 3.5.6**: Backend application framework
 * **Spring Data JPA**: ORM mapping and persistence
 * **Spring WebSocket**: Real-time messaging based on STOMP/Raw WebSocket
 
