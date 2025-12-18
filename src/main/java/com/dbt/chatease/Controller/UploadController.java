@@ -20,27 +20,25 @@ import java.util.UUID;
 @RequestMapping("upload")
 @Tag(name = "UploadController", description = "APIs for uploading and deleting images")
 public class UploadController {
-    // Base storage directory (Should ideally be in application.yml)
+    //Base storage directory (Should ideally be in application.yml)
     private static final String BASE_STORE_DIR = "C:\\imgStore";
 
-    // Sub-directories
+    //Sub-directories
     private static final String IMG_DIR = "/chateaseimg";
     private static final String FILE_DIR = "/chateasefile";
 
     /**
      * Upload Image
-     * URL: POST /upload/blog
      */
     @PostMapping("blog")
     @Operation(summary = "Upload Image", description = "Upload an image file (returns URL)")
     public Result uploadImage(@RequestParam("file") MultipartFile image) {
-        // Reuse handleUpload logic, targeting the image directory
+        //Reuse handleUpload logic, targeting the image directory
         return handleUpload(image, IMG_DIR);
     }
 
     /**
-     * Upload Generic File (Video, Audio, PDF, etc.)
-     * URL: POST /upload/file
+     * Upload Generic File
      */
     @PostMapping("/file")
     @Operation(summary = "Upload Generic File", description = "Upload video, audio or other files")
@@ -50,19 +48,14 @@ public class UploadController {
 
     /**
      * Delete File
-     * URL: GET /upload/blog/delete
-     * Renamed from 'deleteBlogImg' to 'deleteFile' for clarity
      */
     @GetMapping("/blog/delete")
     @Operation(summary = "Delete File", description = "Delete a previously uploaded file by filename/path")
     public Result deleteFile(@RequestParam("name") String filename) {
-        // filename might be "/files/chateaseimg/2023/11/28/xxx.jpg"
-        // We need to convert it back to disk path: "C:\imgStore\chateaseimg\2023\11\28\xxx.jpg"
-
-        // 1. Remove URL prefix "/files" (if provided by frontend)
+        //Remove URL prefix "/files"
         String relativePath = filename.replace("/files", "").replace("/", "\\");
 
-        // 2. Construct full path
+        //Construct path
         File file = new File(BASE_STORE_DIR + relativePath);
 
         if (file.isDirectory() || !file.exists()) {
@@ -82,10 +75,7 @@ public class UploadController {
         }
     }
 
-    /**
-     * Unified upload processing logic
-     * Organize storage by date: /chateaseimg/2023/11/28/uuid.jpg
-     */
+
     private Result handleUpload(MultipartFile file, String subDir) {
         try {
             String originalFilename = file.getOriginalFilename();

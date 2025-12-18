@@ -29,10 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -127,7 +124,7 @@ public class UserInfoServiceImpl implements UserInfoService {
         log.info("User registered successfully with email: {}", email);
 
 
-        //TODO：Create a ChatEase robot friend
+        //TODO：Create a ChatEase robot friend(Done)
         //Get robot settings
         String robotUid = sysSettingRepo.findById("ROBOT_UID")
                 .map(SysSetting::getSettingValue).orElse("UID_ROBOT_001");
@@ -135,7 +132,7 @@ public class UserInfoServiceImpl implements UserInfoService {
         String welcomeMsg = sysSettingRepo.findById("ROBOT_WELCOME")
                 .map(SysSetting::getSettingValue).orElse("Welcome to ChatEase!");
 
-        // 2. Establish relationship (UserRobotRelation)
+        //Establish relationship (UserRobotRelation)
         UserRobotRelation relation = new UserRobotRelation()
                 .setUserId(userInfo.getUserId())
                 .setRobotId(robotUid)
@@ -145,10 +142,10 @@ public class UserInfoServiceImpl implements UserInfoService {
 
         userRobotRelationRepo.save(relation);
 
-        // 3. Send welcome private message
+        //Send welcome private message
         ChatMessage msg = new ChatMessage();
         String[] ids = {userInfo.getUserId(), robotUid};
-        java.util.Arrays.sort(ids);
+        Arrays.sort(ids);
         String sessionId = ids[0] + "_" + ids[1];
         msg.setSessionId(sessionId);
         msg.setSendUserId(robotUid);

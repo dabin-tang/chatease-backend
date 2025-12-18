@@ -1,23 +1,23 @@
 # ChatEase - Instant Messaging Backend
 
 ## Introduction
-ChatEase is an Instant Messaging (IM) backend system built with **Spring Boot 3** and **WebSocket**.
-It supports one-on-one chat, group chat, a complete admin dashboard, multimedia file storage, and app version management. By combining RESTful APIs with WebSocket persistent connections, it ensures real-time messaging, robust data persistence, and business flexibility.
+ChatEase is an Instant Messaging (IM) backend system built with Spring Boot 3 and WebSocket. It supports one-on-one and group chat, an admin dashboard, file uploads, and app version management.
+By using REST APIs together with WebSocket connections, it supports real-time messaging and is easy to extend.
 
 ## Tech Stack
 
 ### Core Frameworks
 * **Java**: JDK 17
-* **Spring Boot 3.5.6**: Backend application framework
-* **Spring Data JPA**: ORM mapping and persistence
-* **Spring WebSocket**: Real-time messaging based on STOMP/Raw WebSocket
+* **Spring Boot 3.5.6**
+* **Spring Data JPA**
+* **Spring WebSocket**
 
 ### Security & Auth
 * **JWT (jjwt)**: Stateless token management
 * **Custom Interceptors**: Hand-written authentication logic (`JwtInterceptor`, `AdminInterceptor`) for securing API endpoints without the overhead of Spring Security.
 
 ### Data Storage & Middleware
-* **MySQL 8.0**: Relational database (Stores Users, Messages, Groups, Settings)
+* **MySQL 8.0**
 * **Redis**: Used for caching verification codes and managing user ban lists (TTL support).
 
 ### Utilities
@@ -29,9 +29,9 @@ It supports one-on-one chat, group chat, a complete admin dashboard, multimedia 
 * **Jackson**: High-performance JSON processor
 
 ### Build & Dev Tools
-* **Maven 3.6+**: Dependency management and build tool
-* **Git**: Version control
-* **JUnit 5**: Unit testing framework
+* **Maven**
+* **Git**
+* **JUnit**
 
 ---
 
@@ -58,7 +58,7 @@ src/main/java/com/dbt/chatease
 
 ## 1. Database Configuration
 1. Create a database named `chatease` in your MySQL server.
-2. Import the SQL script (DDL) to create necessary tables.
+2. Import the SQL script to create necessary tables. (Under the resources folder)
 3. **Update** `src/main/resources/application.yml` with your database credentials:
 
 ```yaml

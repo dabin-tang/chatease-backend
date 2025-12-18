@@ -2,9 +2,8 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- =======================================================
 -- 1. Table: user_info
--- =======================================================
+
 DROP TABLE IF EXISTS `user_info`;
 CREATE TABLE `user_info`
 (
@@ -26,9 +25,9 @@ CREATE TABLE `user_info`
     UNIQUE KEY `idx_key_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User information';
 
--- =======================================================
+
 -- 2. Table: group_info
--- =======================================================
+
 DROP TABLE IF EXISTS `group_info`;
 CREATE TABLE `group_info`
 (
@@ -43,9 +42,9 @@ CREATE TABLE `group_info`
     PRIMARY KEY (`group_id`) USING BTREE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci ROW_FORMAT = DYNAMIC;
 
--- =======================================================
+
 -- 3. Table: user_contact
--- =======================================================
+
 DROP TABLE IF EXISTS `user_contact`;
 CREATE TABLE `user_contact`
 (
@@ -60,9 +59,9 @@ CREATE TABLE `user_contact`
     KEY                `idx_user_status` (`user_id`, `status`) USING BTREE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'Contact list' ROW_FORMAT = DYNAMIC;
 
--- =======================================================
+
 -- 4. Table: user_apply
--- =======================================================
+
 DROP TABLE IF EXISTS `user_apply`;
 CREATE TABLE `user_apply`
 (
@@ -80,9 +79,9 @@ CREATE TABLE `user_apply`
     KEY               `idx_contact` (`contact_id`) USING BTREE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'User application table' ROW_FORMAT = DYNAMIC;
 
--- =======================================================
+
 -- 5. Table: admin_info
--- =======================================================
+
 DROP TABLE IF EXISTS `admin_info`;
 CREATE TABLE `admin_info`
 (
@@ -96,9 +95,9 @@ CREATE TABLE `admin_info`
     UNIQUE KEY `uk_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Administrator table';
 
--- =======================================================
+
 -- 6. Table: sys_setting
--- =======================================================
+
 DROP TABLE IF EXISTS `sys_setting`;
 CREATE TABLE `sys_setting`
 (
@@ -108,9 +107,9 @@ CREATE TABLE `sys_setting`
     PRIMARY KEY (`setting_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='System Global Settings';
 
--- =======================================================
+
 -- 7. Table: sys_broadcast
--- =======================================================
+
 DROP TABLE IF EXISTS `sys_broadcast`;
 CREATE TABLE `sys_broadcast`
 (
@@ -124,9 +123,9 @@ CREATE TABLE `sys_broadcast`
     KEY            `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='System Broadcast Messages';
 
--- =======================================================
+
 -- 8. Table: user_robot_relation
--- =======================================================
+
 DROP TABLE IF EXISTS `user_robot_relation`;
 CREATE TABLE `user_robot_relation`
 (
@@ -140,9 +139,9 @@ CREATE TABLE `user_robot_relation`
     UNIQUE KEY `uk_user_robot` (`user_id`, `robot_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User-Robot Relationship Table';
 
--- =======================================================
+
 -- 9. Table: app_version
--- =======================================================
+
 DROP TABLE IF EXISTS `app_version`;
 CREATE TABLE `app_version`
 (
@@ -158,9 +157,9 @@ CREATE TABLE `app_version`
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='App Version Management';
 
--- =======================================================
+
 -- 10. Table: chat_message
--- =======================================================
+
 DROP TABLE IF EXISTS `chat_message`;
 CREATE TABLE `chat_message`
 (
@@ -183,9 +182,9 @@ CREATE TABLE `chat_message`
     KEY                   `idx_send_time` (`send_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Chat message history';
 
--- =======================================================
+
 -- 11. Table: chat_session
--- =======================================================
+
 DROP TABLE IF EXISTS `chat_session`;
 CREATE TABLE `chat_session`
 (
@@ -203,11 +202,9 @@ CREATE TABLE `chat_session`
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User chat sessions list';
 
 
--- =======================================================
--- Data Initialization
--- =======================================================
 
--- 1. Init Robot Config
+-- Data Initialization
+--Init Robot Config
 INSERT INTO `sys_setting` (`setting_code`, `setting_value`, `description`)
 VALUES ('ROBOT_UID', 'UID_ROBOT_001', 'Fixed Robot ID'),
        ('ROBOT_NICKNAME', 'ChatEase Helper', 'Nickname displayed for the robot'),
@@ -217,15 +214,15 @@ VALUES ('ROBOT_UID', 'UID_ROBOT_001', 'Fixed Robot ID'),
 UPDATE `setting_value` =
 VALUES (`setting_value`);
 
--- 2. Init Super Admin
+-- Init Super Admin
 -- Default User: admin
--- Password Hash: Please replace with your generated real hash
+-- Password Hash: Please replace with your generated real hash!!!!!!
 INSERT INTO `admin_info` (`username`, `password`, `role`, `create_time`)
 VALUES ('admin', '.....', 'super_admin', NOW()) ON DUPLICATE KEY
 UPDATE `role` =
 VALUES (`role`);
 
--- 3. Init First System Broadcast (For new users)
+--Init First System Broadcast (For new users)
 INSERT INTO `sys_broadcast` (`sender_id`, `content`, `message_type`, `create_time`)
 VALUES ('UID_ROBOT_001', 'Hi! Welcome to ChatEase. Connect naturally.', 0, NOW());
 

@@ -6,6 +6,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface SysSettingRepository extends JpaRepository<SysSetting, String> {
-    // No extra methods needed. 
-    // JpaRepository provides findById(String settingCode) out of the box.
+
 }

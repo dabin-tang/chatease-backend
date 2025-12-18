@@ -14,7 +14,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/chatease?useSSL=false&serverTimezone=UTC
     username: root
-    password: #your_mysql_password
+    password: 13664923090
 
   data:
     redis:
@@ -40,8 +40,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: #your gmail address
-    password:  #your gmail app password
+    username: dabint2003@gmail.com
+    password: eqxf trag bsop briz #your gmail app password
     protocol: smtp
     properties:
       mail.smtp.auth: true

@@ -29,7 +29,7 @@ public class UserInfoController {
      * Send email verification code
      *
      * @param email
-     * @return
+     *
      */
     @Operation(summary = "Send email verification code")
     @PostMapping("/sendCode")
@@ -43,7 +43,6 @@ public class UserInfoController {
      * Register user
      *
      * @param userRegisterDTO
-     * @return
      */
     @Operation(summary = "Register user")
     @PostMapping("/register")
@@ -57,7 +56,7 @@ public class UserInfoController {
      * User login
      *
      * @param userLoginDTO
-     * @return
+     * @return JWT token and user info
      */
     @Operation(summary = "User login")
     @PostMapping("/login")
@@ -81,7 +80,7 @@ public class UserInfoController {
     /**
      * Update current logged-in user information
      *
-     * @param userInfoUpdateDTO user information to update
+     * @param userInfoUpdateDTO
      * @return success or fail
      */
     @Operation(summary = "Update Current User Info", description = "Update information of the currently logged-in user")

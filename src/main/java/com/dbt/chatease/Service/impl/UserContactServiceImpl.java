@@ -9,6 +9,7 @@ import com.dbt.chatease.Utils.UserContext;
 import com.dbt.chatease.VO.ContactVO;
 import com.dbt.chatease.VO.GroupBasicVO;
 import com.dbt.chatease.VO.UserInfoVO;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.Optional;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class UserContactServiceImpl implements UserContactService {
     private final UserContactRepository userContactRepository;
     private final UserInfoRepository userInfoRepository;
@@ -29,22 +31,6 @@ public class UserContactServiceImpl implements UserContactService {
     private final UserRobotRelationRepository userRobotRelationRepository;
     private final SysSettingRepository sysSettingRepository;
 
-    /**
-     * Manual Constructor Injection to ensure all dependencies are injected correctly.
-     * This avoids potential issues with Lombok's @RequiredArgsConstructor
-     */
-    @Autowired
-    public UserContactServiceImpl(UserContactRepository userContactRepository,
-                                  UserInfoRepository userInfoRepository,
-                                  GroupInfoRepository groupInfoRepository,
-                                  UserRobotRelationRepository userRobotRelationRepository,
-                                  SysSettingRepository sysSettingRepository) {
-        this.userContactRepository = userContactRepository;
-        this.userInfoRepository = userInfoRepository;
-        this.groupInfoRepository = groupInfoRepository;
-        this.userRobotRelationRepository = userRobotRelationRepository;
-        this.sysSettingRepository = sysSettingRepository;
-    }
 
     @Override
     public Result searchFriendOrGroup(String contactId) {
@@ -93,18 +79,16 @@ public class UserContactServiceImpl implements UserContactService {
         }
         String currentUserId = UserContext.getCurrentUserId();
 
-        // Case 0: Get Friend Contacts
+        // Get Friend Contacts
         if (Integer.valueOf(0).equals(contactType)) {
-            // 1. Fetch friend list directly mapped to ContactVO (Optimized SQL)
-            // Wrap in ArrayList to make it mutable for adding the Robot
+            //Get friend list
             List<ContactVO> friends = new ArrayList<>(userContactRepository.findFriendContacts(currentUserId));
 
-            // 2. Inject Robot Logic
             List<UserRobotRelation> robotRelations = userRobotRelationRepository.findByUserIdAndStatus(currentUserId, 1);
             if (!robotRelations.isEmpty()) {
                 UserRobotRelation relation = robotRelations.get(0);
 
-                // Get Robot Info from settings or use defaults
+                //Get Robot Info from settings or use defaults
                 String robotNick = sysSettingRepository.findById("ROBOT_NICKNAME")
                         .map(SysSetting::getSettingValue).orElse("ChatEase Helper");
                 String robotAvatar = sysSettingRepository.findById("ROBOT_AVATAR")
@@ -123,14 +107,14 @@ public class UserContactServiceImpl implements UserContactService {
                 uc.setCreateTime(relation.getCreateTime());
                 robotVO.setUserContact(uc);
 
-                // Add Robot to the top of the list
+                //Add Robot to the top of the list
                 friends.add(0, robotVO);
             }
 
             return Result.ok(friends);
 
         } else if (Integer.valueOf(1).equals(contactType)) {
-            // Case 1: Get Group Contacts
+            //Get Group Contacts
             List<ContactVO> groups = userContactRepository.findGroupContacts(currentUserId);
             return Result.ok(groups);
         }

@@ -353,7 +353,7 @@ public class UserApplyServiceImpl implements UserApplyService {
     }
 
     /**
-     * Helper to update or create a ChatSession
+     * update or create a ChatSession
      */
     private void updateSessionForUser(String userId, String contactId, String content, Long time, Integer type) {
         ChatSession session = chatSessionRepository.findByUserIdAndContactId(userId, contactId);
@@ -367,14 +367,14 @@ public class UserApplyServiceImpl implements UserApplyService {
 
             //Fill basic info (Avatar/Name) to avoid blank session on UI
             if (type == 0) {
-                // Fetch Friend Info
+                //Get Friend Info
                 var userOpt = userInfoRepository.findById(contactId);
                 if (userOpt.isPresent()) {
                     session.setContactName(userOpt.get().getNickName());
                     session.setContactAvatar(userOpt.get().getAvatar());
                 }
             } else {
-                //Fetch Group Info
+                //Get Group Info
                 var groupOpt = groupInfoRepository.findById(contactId);
                 if (groupOpt.isPresent()) {
                     session.setContactName(groupOpt.get().getGroupName());

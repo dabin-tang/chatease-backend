@@ -26,17 +26,15 @@ public class JwtInterceptor implements HandlerInterceptor {
 //            "/v3/api-docs/**",
 //            "/error",
 //            "/api/app-version/latest"
-            // 修正为真实的 Controller 路径
             "/user-info/login",
             "/user-info/register",
             "/user-info/sendCode",
 
-            // 其他静态资源和文档
             "/swagger-ui/**",
             "/v3/api-docs/**",
             "/error",
-            "/files/**", // 放行文件访问
-            // 客户端版本检测 (这个Controller你自己加了/api前缀，所以是对的)
+            "/files/**",
+
             "/api/app-version/latest",
             "/ws/**"
     };

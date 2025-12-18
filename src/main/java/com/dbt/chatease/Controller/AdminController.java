@@ -46,25 +46,25 @@ public class AdminController {
 
         log.info("Admin login attempt: {}", username);
 
-        //1. Find admin by username
+        //Find admin by username
         AdminInfo admin = adminInfoRepository.findByUsername(username);
         if (admin == null) {
             return Result.fail("Admin account not found");
         }
 
-        //2. Verify password
+        //Verify password
         if (!PasswordUtil.checkPassword(password, admin.getPassword())) {
             return Result.fail("Incorrect password");
         }
 
-        //3. Update last login time
+        //Update last login time
         admin.setLastLoginTime(LocalDateTime.now());
         adminInfoRepository.save(admin);
 
-        //4. Generate admin-specific token
+        //Generate admin-specific token
         String token = jwtUtil.generateAdminToken(admin);
 
-        //5. Build response
+        //Build response
         Map<String, Object> data = new HashMap<>();
         data.put("token", token);
         data.put("adminName", admin.getUsername());

@@ -14,7 +14,7 @@ public interface UserRobotRelationRepository extends JpaRepository<UserRobotRela
      * Used when fetching the session list (to show the robot).
      *
      * @param userId The user ID
-     * @param status Status (e.g., 1 for Normal)
+     * @param status Status (1 for Normal)
      * @return List of relations
      */
     List<UserRobotRelation> findByUserIdAndStatus(String userId, Integer status);

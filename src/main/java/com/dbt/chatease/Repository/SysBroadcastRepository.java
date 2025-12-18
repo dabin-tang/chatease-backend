@@ -14,7 +14,6 @@ public interface SysBroadcastRepository extends JpaRepository<SysBroadcast, Long
      * Find broadcasts created after a specific time.
      * Used to pull system messages sent AFTER the user registered.
      *
-     * @param time Usually the user's registration time or last read time
      * @return List of broadcast messages
      */
     List<SysBroadcast> findByCreateTimeAfter(LocalDateTime time);

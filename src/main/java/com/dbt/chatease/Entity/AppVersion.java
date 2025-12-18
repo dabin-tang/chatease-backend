@@ -29,4 +29,5 @@ public class AppVersion {
     
     @Column(name = "create_time")
     private LocalDateTime createTime;
+
 }

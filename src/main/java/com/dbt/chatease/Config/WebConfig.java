@@ -27,12 +27,12 @@ public class WebConfig implements WebMvcConfigurer {
 //    }
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 1. 普通用户拦截器 (拦截所有路径 /**)
-        // 具体的排除逻辑交给 JwtInterceptor 内部的 EXCLUDE_PATHS 处理
+        //1. 1. Regular User Interceptor (Intercepts all paths /**)
+        //Path exclusions are handled by EXCLUDE_PATHS in JwtInterceptor
         registry.addInterceptor(jwtInterceptor)
                 .addPathPatterns("/**");
 
-        // 2. 管理员拦截器 (拦截 /admin/**)
+        //2. Admin interceptor (intercepts /admin/**)
         registry.addInterceptor(adminInterceptor)
                 .addPathPatterns("/admin/**")
                 .excludePathPatterns("/admin/login");

@@ -36,7 +36,6 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
 
     /**
      * Find friend contacts with UserInfo joined.
-     * Uses constructor expression to map directly to ContactVO.
      */
     @Query("SELECT new com.dbt.chatease.VO.ContactVO(uc, ui.nickName, ui.avatar, null, null) " +
             "FROM UserContact uc " +
@@ -47,7 +46,6 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
 
     /**
      * Find group contacts with GroupInfo joined.
-     * Uses constructor expression to map directly to ContactVO.
      */
     @Query("SELECT new com.dbt.chatease.VO.ContactVO(uc, null, null, gi.groupName, gi.groupAvatar) " +
             "FROM UserContact uc " +

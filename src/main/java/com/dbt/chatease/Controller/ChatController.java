@@ -18,7 +18,7 @@ public class ChatController {
     private final ChatService chatService;
 
     /**
-     * Interface A: Get Session List (Home Page)
+     * Get Session List (Home Page)
      */
     @GetMapping("/sessions")
     @Operation(summary = "Get Session List", description = "Get the list of recent chats with unread counts")
@@ -27,7 +27,7 @@ public class ChatController {
     }
 
     /**
-     * Interface B: Get Chat History
+     * Get Chat History
      */
     @GetMapping("/history")
     @Operation(summary = "Get Chat History", description = "Get message history for a specific contact or group")
@@ -37,7 +37,7 @@ public class ChatController {
     }
 
     /**
-     * Interface C: Mark as Read (Clear Red Dot)
+     * Mark as Read (Clear Red Dot)
      */
     @PutMapping("/read")
     @Operation(summary = "Mark as Read", description = "Clear unread count for a session")

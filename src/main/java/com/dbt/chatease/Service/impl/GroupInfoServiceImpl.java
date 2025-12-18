@@ -259,7 +259,7 @@ public class GroupInfoServiceImpl implements GroupInfoService {
                     userContactRepository.save(targetContact);
                 }
             } else {
-                // New member
+                //New member
                 UserContact newContact = new UserContact()
                         .setUserId(targetUserId)
                         .setContactId(groupId)
