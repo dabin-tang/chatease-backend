@@ -17,4 +17,14 @@ public class GroupMemberDTO {
     private String nickName;
     private String avatar;
     private Integer sex;
+    @Schema(description = "Role: 0-Owner, 1-Admin, 3-Member")
+    private Integer role;
+    @Schema(description = "User ID of the member")
+    private String userId;
+    public GroupMemberDTO(UserContact userContact, String nickName, String avatar, Integer sex) {
+        this.userContact = userContact;
+        this.nickName = nickName;
+        this.avatar = avatar;
+        this.sex = sex;
+    }
 }

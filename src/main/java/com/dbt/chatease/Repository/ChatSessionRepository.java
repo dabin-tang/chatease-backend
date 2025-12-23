@@ -17,4 +17,6 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, ChatSe
      * Find a specific session by user ID and contact ID.
      */
     ChatSession findByUserIdAndContactId(String userId, String contactId);
+
+    List<ChatSession> findByUserId(String userId);
 }

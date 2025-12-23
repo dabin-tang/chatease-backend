@@ -30,8 +30,14 @@ public class MessageVO {
 
     @Schema(description = "Send Timestamp")
     private Long sendTime;
-    
-    // 标记是否是我自己发的消息（方便前端渲染在右边）
+
     @Schema(description = "Is sent by current user")
     private Boolean isMe;
+
+    @Schema(description = "File Name (if applicable)")
+    private String fileName;
+
+    @Schema(description = "File Size in bytes (if applicable)")
+    private Long fileSize;
+
 }

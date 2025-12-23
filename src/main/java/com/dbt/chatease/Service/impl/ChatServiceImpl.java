@@ -14,6 +14,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,46 +36,34 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public Result getMySessions() {
         String currentUserId = UserContext.getCurrentUserId();
-        List<ChatSession> sessions = chatSessionRepository.findByUserIdOrderByLastReceiveTimeDesc(currentUserId);
-
-        List<ChatSessionVO> voList = sessions.stream().map(session -> {
+        //Get sessions
+        List<ChatSession> sessions = chatSessionRepository.findByUserId(currentUserId);
+        List<ChatSessionVO> sessionVOs = new ArrayList<>();
+        if (sessions.isEmpty()) {
+            return Result.ok(sessionVOs);
+        }
+        //Get latest avatars and names
+        for (ChatSession session : sessions) {
             ChatSessionVO vo = new ChatSessionVO();
             BeanUtils.copyProperties(session, vo);
-            return vo;
-        }).collect(Collectors.toList());
 
-        //Ensure Robot Session Exists
-        String robotUid = sysSettingRepository.findById("ROBOT_UID")
-                .map(SysSetting::getSettingValue).orElse("UID_ROBOT_001");
-        boolean hasRobot = voList.stream().anyMatch(s -> s.getContactId().equals(robotUid));
-
-        if (!hasRobot) {
-            String robotNick = sysSettingRepository.findById("ROBOT_NICKNAME")
-                    .map(SysSetting::getSettingValue).orElse("ChatEase Helper");
-            String robotAvatar = sysSettingRepository.findById("ROBOT_AVATAR")
-                    .map(SysSetting::getSettingValue).orElse("https://api.dicebear.com/7.x/bottts/png?seed=default");
-
-            SysBroadcast latestBroadcast = sysBroadcastRepository.findTopByOrderByCreateTimeDesc();
-
-            ChatSessionVO robotSession = new ChatSessionVO();
-            robotSession.setSessionId(robotUid);
-            robotSession.setContactId(robotUid);
-            robotSession.setContactName(robotNick);
-            robotSession.setContactAvatar(robotAvatar);
-            robotSession.setContactType(0);
-            robotSession.setUnreadCount(0);
-
-            if (latestBroadcast != null) {
-                robotSession.setLastMessage(latestBroadcast.getContent());
-                robotSession.setLastReceiveTime(java.sql.Timestamp.valueOf(latestBroadcast.getCreateTime()).getTime());
+            if (session.getContactType() == 1) {
+                //It's a Group: Fetch latest Group Info
+                groupInfoRepository.findById(session.getContactId()).ifPresent(group -> {
+                    vo.setContactName(group.getGroupName());   //Use latest name
+                    vo.setContactAvatar(group.getGroupAvatar()); //Use latest avatar
+                });
             } else {
-                robotSession.setLastMessage("Welcome to ChatEase!");
-                robotSession.setLastReceiveTime(System.currentTimeMillis());
+                //It's a User: Get latest User Info
+                userInfoRepository.findById(session.getContactId()).ifPresent(user -> {
+                    vo.setContactName(user.getNickName());      //Use latest nickname
+                    vo.setContactAvatar(user.getAvatar());      //Use latest avatar
+                });
             }
-            voList.add(0, robotSession);
+            sessionVOs.add(vo);
         }
-
-        return Result.ok(voList);
+        sessionVOs.sort((a, b) -> Long.compare(b.getLastReceiveTime(), a.getLastReceiveTime()));
+        return Result.ok(sessionVOs);
     }
 
     @Override

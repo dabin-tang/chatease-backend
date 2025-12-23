@@ -4,6 +4,7 @@ import com.dbt.chatease.Entity.ChatMessage;
 import com.dbt.chatease.Entity.ChatSession;
 import com.dbt.chatease.Entity.GroupInfo;
 import com.dbt.chatease.Entity.UserContact;
+import com.dbt.chatease.Entity.UserInfo;
 import com.dbt.chatease.Repository.*;
 import com.dbt.chatease.Utils.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,22 +41,18 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        log.info("WebSocket attempt from: " + session.getRemoteAddress());
+        log.info("WebSocket Connection : " + session.getRemoteAddress());
 
         String token = getTokenFromSession(session);
-        log.info("Extracted Token: " + (token == null ? "NULL" : token.substring(0, 10) + "..."));
-
         if (token == null) {
-            log.error("Token is null, closing session.");
+            log.error("Token is null");
             session.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
 
         boolean isValid = jwtUtil.validateToken(token);
-        log.info("Token Validation Result: " + isValid);
-
         if (!isValid) {
-            log.error("Token invalid, closing session.");
+            log.error("Token invalid");
             session.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
@@ -63,104 +60,94 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         String userId = jwtUtil.getUserIdFromToken(token);
         ONLINE_USERS.put(userId, session);
         session.getAttributes().put("userId", userId);
-        log.info("User connected successfully: {}", userId);
+        log.info("User Connected: {}", userId);
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String payload = message.getPayload();
-        log.info("Received message: {}", payload);
+        log.info("Received: {}", payload);
 
-        // Parse JSON to ChatMessage object
-        ChatMessage chatMessage = objectMapper.readValue(payload, ChatMessage.class);
         String senderId = (String) session.getAttributes().get("userId");
+        if (senderId == null) {
+            log.error("Sender ID not found in session");
+            return;
+        }
 
-        // Robot UID constant
+        ChatMessage chatMessage;
+        try {
+            chatMessage = objectMapper.readValue(payload, ChatMessage.class);
+        } catch (Exception e) {
+            log.error("JSON Parse Error", e);
+            return;
+        }
+
+        chatMessage.setSendUserId(senderId);
+        UserInfo senderInfo = userInfoRepository.findById(senderId).orElse(null);
+        if (senderInfo != null) {
+            chatMessage.setSendUserAvatar(senderInfo.getAvatar());
+            chatMessage.setSendUserNickName(senderInfo.getNickName());
+        }
+
         String robotUid = "UID_ROBOT_001";
+        log.info("Processing Message: Type={}, To={}", chatMessage.getContactType(), chatMessage.getContactId());
 
-        // ==========================================
-        // 1. Security Checks
-        // ==========================================
+        //Security Checks
         if (chatMessage.getContactType() == 0) {
-            // Personal Chat Security
-            // If sending to Robot, SKIP friend check (allow "Tree Hole" mode)
-            if (chatMessage.getContactId().equals(robotUid)) {
-                log.info("User {} sent message to Robot (Tree Hole)", senderId);
-            } else {
-                // Normal User: Check if they are friends (Status must be 1)
-                com.dbt.chatease.Entity.UserContact contact = userContactRepository.findByUserIdAndContactIdAndContactType(
+            // Personal Chat
+            if (!chatMessage.getContactId().equals(robotUid)) {
+                UserContact contact = userContactRepository.findByUserIdAndContactIdAndContactType(
                         senderId, chatMessage.getContactId(), 0);
 
-                // Status 1 means active friend. If null, 0, 2 (deleted), 3 (blocked) -> Reject.
                 if (contact == null || contact.getStatus() != 1) {
-                    log.warn("Message rejected: Not friends. Sender: {}, Receiver: {}", senderId, chatMessage.getContactId());
+                    log.warn("Not friends. Sender: {}, Receiver: {}", senderId, chatMessage.getContactId());
                     return;
                 }
             }
         } else {
-            // Group Chat Security
-            // Check if group exists and is active
-            GroupInfo group = groupInfoRepository.findById(chatMessage.getContactId()).orElse(null);
-            if (group == null || group.getStatus() == 0) {
-                log.warn("Message rejected: Group disbanded or not found. Group: {}", chatMessage.getContactId());
-                return;
-            }
-
-            // Check if sender is a group member
-            com.dbt.chatease.Entity.UserContact member = userContactRepository.findByUserIdAndContactIdAndContactType(
+            //Group Chat
+            UserContact member = userContactRepository.findByUserIdAndContactIdAndContactType(
                     senderId, chatMessage.getContactId(), 1);
             if (member == null || member.getStatus() != 1) {
-                log.warn("Message rejected: Not a group member. Sender: {}, Group: {}", senderId, chatMessage.getContactId());
+                log.warn("Not group member.");
                 return;
             }
         }
 
-        // ==========================================
-        // 2. Fix: Generate Session ID (Critical!)
-        // ==========================================
+        //Generate Session ID
         if (chatMessage.getContactType() == 0) {
-            // Personal Chat: Sort IDs to ensure unique session key (e.g., "A_B" is same as "B_A")
             String[] ids = {senderId, chatMessage.getContactId()};
             java.util.Arrays.sort(ids);
             chatMessage.setSessionId(ids[0] + "_" + ids[1]);
         } else {
-            // Group Chat: SessionID is just the GroupID
             chatMessage.setSessionId(chatMessage.getContactId());
         }
 
-        // ==========================================
-        // 3. Fill & Save
-        // ==========================================
-        chatMessage.setSendUserId(senderId);
+        //Save to Database
         chatMessage.setSendTime(System.currentTimeMillis());
-        chatMessage.setStatus(1); // Set as Sent
+        chatMessage.setStatus(1);
 
-        // Now session_id is set, so this save will succeed
-        chatMessageRepository.save(chatMessage);
+        try {
+            chatMessageRepository.save(chatMessage);
+            updateChatSession(chatMessage);
+        } catch (Exception e) {
+            log.error("Error", e);
+        }
 
-        // Update ChatSession (For Recent Chat List & Unread Count)
-        updateChatSession(chatMessage);
-
-        // ==========================================
-        // 4. Push to Receiver
-        // ==========================================
+        //Push Message
         TextMessage textMessage = new TextMessage(objectMapper.writeValueAsString(chatMessage));
 
         if (chatMessage.getContactType() == 0) {
-            // Personal Chat
-            // Only send via WebSocket if receiver is NOT the robot
+            //Personal Chat
             if (!chatMessage.getContactId().equals(robotUid)) {
                 sendMessageToUser(chatMessage.getContactId(), textMessage);
             }
-        } else if (chatMessage.getContactType() == 1) {
+            sendMessageToUser(senderId, textMessage);
+        } else {
             // Group Chat
-            // Find all members in the group
             List<UserContact> members = userContactRepository.findByContactIdAndContactType(chatMessage.getContactId(), 1);
             for (UserContact member : members) {
-                // Don't send to self (sender already has optimistic update)
-                if (!member.getUserId().equals(senderId)) {
-                    sendMessageToUser(member.getUserId(), textMessage);
-                }
+                sendMessageToUser(member.getUserId(), textMessage);
             }
         }
     }
@@ -168,29 +155,19 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         String userId = (String) session.getAttributes().get("userId");
-        if (userId != null) {
-            ONLINE_USERS.remove(userId);
-        }
+        if (userId != null) ONLINE_USERS.remove(userId);
+        log.info("User Disconnected: {}", userId);
     }
 
-    //Helper Methods
 
-    /**
-     * Update session for both sender and receiver(s)
-     */
     private void updateChatSession(ChatMessage msg) {
-        //1. Update Sender's session (No unread increment)
         updateSingleSession(msg.getSendUserId(), msg.getContactId(), msg.getContent(), msg.getSendTime(), 0);
-
         if (msg.getContactType() == 0) {
-            //2. Personal: Update Receiver's session (Unread +1)
             updateSingleSession(msg.getContactId(), msg.getSendUserId(), msg.getContent(), msg.getSendTime(), 1);
         } else {
-            //3. Group: Update All Members' sessions
             List<UserContact> members = userContactRepository.findByContactIdAndContactType(msg.getContactId(), 1);
             for (UserContact member : members) {
                 if (!member.getUserId().equals(msg.getSendUserId())) {
-                    //userId=Member, contactId=GroupId
                     updateSingleSession(member.getUserId(), msg.getContactId(), msg.getContent(), msg.getSendTime(), 1);
                 }
             }
@@ -198,57 +175,46 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void updateSingleSession(String userId, String contactId, String content, Long time, int unreadIncrement) {
-        // 1. Try to find an existing session
-        ChatSession chatSession = chatSessionRepository.findByUserIdAndContactId(userId, contactId);
-
-        // 2. If session does not exist, create a new one
-        if (chatSession == null) {
-            chatSession = new ChatSession();
-            chatSession.setUserId(userId);
-            chatSession.setContactId(contactId);
-            chatSession.setUnreadCount(0); // Initialize unread count
-
-            // 3. Determine contact type, fill info, and GENERATE SESSION ID
-            if (contactId.startsWith("GID")) {
-                chatSession.setContactType(1); // Group
-
-                // Fix: Set Session ID for Group (SessionID = GroupID)
-                chatSession.setSessionId(contactId);
-
-                // Fetch Group Info to fill name/avatar
-                var groupOpt = groupInfoRepository.findById(contactId);
-                if (groupOpt.isPresent()) {
-                    chatSession.setContactName(groupOpt.get().getGroupName());
-                    chatSession.setContactAvatar(groupOpt.get().getGroupAvatar());
+        try {
+            ChatSession chatSession = chatSessionRepository.findByUserIdAndContactId(userId, contactId);
+            if (chatSession == null) {
+                chatSession = new ChatSession();
+                chatSession.setUserId(userId);
+                chatSession.setContactId(contactId);
+                chatSession.setUnreadCount(0);
+                if (contactId.startsWith("GID")) {
+                    chatSession.setContactType(1);
+                    chatSession.setSessionId(contactId);
+                    var groupOpt = groupInfoRepository.findById(contactId);
+                    if (groupOpt.isPresent()) {
+                        chatSession.setContactName(groupOpt.get().getGroupName());
+                        chatSession.setContactAvatar(groupOpt.get().getGroupAvatar());
+                    }
+                } else {
+                    chatSession.setContactType(0);
+                    String[] ids = {userId, contactId};
+                    java.util.Arrays.sort(ids);
+                    chatSession.setSessionId(ids[0] + "_" + ids[1]);
+                    var userOpt = userInfoRepository.findById(contactId);
+                    if (userOpt.isPresent()) {
+                        chatSession.setContactName(userOpt.get().getNickName());
+                        chatSession.setContactAvatar(userOpt.get().getAvatar());
+                    }
                 }
-            } else {
-                chatSession.setContactType(0); // Personal
-
-                // Fix: Set Session ID for Personal Chat (Sorted user IDs to ensure consistency)
-                String[] ids = {userId, contactId};
-                java.util.Arrays.sort(ids);
-                chatSession.setSessionId(ids[0] + "_" + ids[1]);
-
-                // Fetch User Info to fill name/avatar
-                var userOpt = userInfoRepository.findById(contactId);
-                if (userOpt.isPresent()) {
-                    chatSession.setContactName(userOpt.get().getNickName());
-                    chatSession.setContactAvatar(userOpt.get().getAvatar());
-                }
+                //Fallback name
+                if (chatSession.getContactName() == null) chatSession.setContactName("User");
             }
+
+            //For Mixed Message (Type 6)
+            chatSession.setLastMessage(content);
+            chatSession.setLastReceiveTime(time);
+            if (unreadIncrement > 0) {
+                chatSession.setUnreadCount(chatSession.getUnreadCount() + unreadIncrement);
+            }
+            chatSessionRepository.save(chatSession);
+        } catch (Exception e) {
+            log.error("Session update error", e);
         }
-
-        // 4. Update the latest message content and time
-        chatSession.setLastMessage(content);
-        chatSession.setLastReceiveTime(time);
-
-        // 5. Increment unread count if needed
-        if (unreadIncrement > 0) {
-            chatSession.setUnreadCount(chatSession.getUnreadCount() + unreadIncrement);
-        }
-
-        // 6. Save to database
-        chatSessionRepository.save(chatSession);
     }
 
     private void sendMessageToUser(String userId, TextMessage message) {
@@ -266,14 +232,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private String getTokenFromSession(WebSocketSession session) {
         URI uri = session.getUri();
-        log.info("WebSocket URI: " + uri);
-
         if (uri != null && uri.getQuery() != null) {
-            String[] params = uri.getQuery().split("&");
-            for (String param : params) {
-                if (param.startsWith("token=")) {
-                    return param.substring(6);
-                }
+            for (String param : uri.getQuery().split("&")) {
+                if (param.startsWith("token=")) return param.substring(6);
             }
         }
         return null;
@@ -284,9 +245,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             String json = objectMapper.writeValueAsString(messageObj);
             sendMessageToUser(userId, new TextMessage(json));
         } catch (IOException e) {
-            log.error("Failed to push system notification to user: {}", userId, e);
+            log.error("Failed to push system notification: {}", userId, e);
         }
     }
-
-
 }

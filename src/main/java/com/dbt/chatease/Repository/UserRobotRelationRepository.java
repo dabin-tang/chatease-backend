@@ -23,4 +23,6 @@ public interface UserRobotRelationRepository extends JpaRepository<UserRobotRela
      * Check if a relationship already exists (to prevent duplicates).
      */
     boolean existsByUserIdAndRobotId(String userId, String robotId);
+
+    UserRobotRelation findByUserIdAndRobotId(String userId, String robotId);
 }

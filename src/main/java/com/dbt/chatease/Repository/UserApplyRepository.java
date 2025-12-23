@@ -15,28 +15,8 @@ public interface UserApplyRepository extends JpaRepository<UserApply, Integer> {
     UserApply findByApplyUserIdAndReceiveUserIdAndContactIdAndContactType(
             String applyUserId, String receiveUserId, String contactId, Integer contactType);
 
-    @Query("SELECT " +
-            "ua as userApply, " +
-            "ui.nickName as applyUserNickName, " +
-            "ui.avatar as applyUserAvatar " +
-            "FROM UserApply ua " +
-            "JOIN UserInfo ui ON ua.applyUserId = ui.userId " +
-            "WHERE ua.receiveUserId = :receiveUserId AND ua.contactType = 0 " +
-            "ORDER BY ua.lastApplyTime DESC")
-    Page<FriendRequestVO> findFriendRequestsWithUserInfo(@Param("receiveUserId") String receiveUserId, Pageable pageable);
-
-    @Query("SELECT " +
-            "ua as userApply, " +
-            "ui.nickName as applyUserNickName, " +
-            "ui.avatar as applyUserAvatar, " +
-            "gi.groupName as groupName, " +
-            "gi.groupAvatar as groupAvatar " +
-            "FROM UserApply ua " +
-            "JOIN UserInfo ui ON ua.applyUserId = ui.userId " +
-            "JOIN GroupInfo gi ON ua.contactId = gi.groupId " +
-            "WHERE ua.receiveUserId = :receiveUserId AND ua.contactType = 1 " +
-            "ORDER BY ua.lastApplyTime DESC")
-    Page<GroupRequestVO> findGroupRequestsWithInfo(@Param("receiveUserId") String receiveUserId, Pageable pageable);
-
+    //Get requests by receiver ID and type (0: Friend, 1: Group)
+    Page<UserApply> findByReceiveUserIdAndContactTypeOrderByLastApplyTimeDesc(
+            String receiveUserId, Integer contactType, Pageable pageable);
 
 }

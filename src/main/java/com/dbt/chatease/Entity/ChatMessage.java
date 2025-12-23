@@ -17,8 +17,6 @@ public class ChatMessage {
 
     /**
      * Session ID.
-     * Personal chat: Sorted(UID1, UID2)
-     * Group chat: GroupID
      */
     @Column(name = "session_id", length = 32, nullable = false)
     private String sessionId;
@@ -26,11 +24,11 @@ public class ChatMessage {
     /**
      * Sender User ID
      */
-    @Column(name = "send_user_id", length = 12, nullable = false)
+    @Column(name = "send_user_id", length = 32, nullable = false)
     private String sendUserId;
 
     /**
-     * Redundant: Sender Nickname (for display performance)
+     * Redundant: Sender Nickname
      */
     @Column(name = "send_user_nick_name", length = 20)
     private String sendUserNickName;
@@ -44,7 +42,7 @@ public class ChatMessage {
     /**
      * Receiver ID (Target User ID or Group ID)
      */
-    @Column(name = "contact_id", length = 12, nullable = false)
+    @Column(name = "contact_id", length = 32, nullable = false)
     private String contactId;
 
     /**
@@ -54,31 +52,36 @@ public class ChatMessage {
     private Integer contactType;
 
     /**
-     * Message Content
+     * Message Content (Text)
      */
     @Column(name = "content", length = 1000)
     private String content;
 
     /**
-     * Message Type: 0-Text, 1-Image, 2-File, 5-System
+     * Message Type:
+     * 0: Text
+     * 1: Image (Legacy, URL in content)
+     * 2: File
+     * 5: System Notification
+     * 6: Mixed (Text + Image) :Text in 'content', Image URL in 'filePath'
      */
     @Column(name = "message_type")
     private Integer messageType;
 
     /**
-     * File Size (if applicable)
+     * File Size
      */
     @Column(name = "file_size")
     private Long fileSize;
 
     /**
-     * File Name (if applicable)
+     * File Name
      */
     @Column(name = "file_name", length = 200)
     private String fileName;
 
     /**
-     * File Path (if applicable)
+     * File Path or Image URL
      */
     @Column(name = "file_path", length = 255)
     private String filePath;

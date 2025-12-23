@@ -40,7 +40,7 @@ public class UserContactController {
      *
      * @return list of contacts
      */
-    @GetMapping("/my-contacts")
+    @GetMapping("/list")
     @Operation(summary = "Get My Contacts", description = "Get the list of contacts for the current user")
     public Result getMyContacts(@RequestParam Integer contactType) {
         log.info("Get My Contacts");

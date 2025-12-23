@@ -66,7 +66,7 @@ public class UserApplyController {
      */
     @PutMapping("/process-apply-request")
     @Operation(summary = "Process Apply Request", description = "Approve or reject a friend or group join request")
-    public Result processApplyRequest(Integer applyId, Integer status) {
+    public Result processApplyRequest(@RequestParam Integer applyId, @RequestParam Integer status) {
         log.info("Process Apply Request: applyId={}, status={}", applyId, status);
         return userApplyService.processApplyRequest(applyId, status);
     }

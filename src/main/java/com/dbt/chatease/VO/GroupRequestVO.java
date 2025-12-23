@@ -9,19 +9,36 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Schema(name = "GroupRequestVO", description = "Group request view object with applicant and group info")
 public class GroupRequestVO {
+    @Schema(description = "Application ID")
+    private Integer applyId;
 
-    @Schema(description = "Application information")
-    private UserApply userApply;
+    @Schema(description = "Applicant User ID")
+    private String applicantId;
 
-    @Schema(description = "Applicant nickname", example = "John")
-    private String applyUserNickName;
+    @Schema(description = "Applicant nickname")
+    private String applicantName;
 
-    @Schema(description = "Applicant avatar URL", example = "http://example.com/avatar.jpg")
-    private String applyUserAvatar;
+    @Schema(description = "Applicant avatar URL")
+    private String applicantAvatar;
 
-    @Schema(description = "Group name", example = "Development Team")
+    @Schema(description = "Group ID (Target ID)")
+    private String groupId;
+
+    @Schema(description = "Group name")
     private String groupName;
 
-    @Schema(description = "Group avatar URL", example = "http://example.com/group-avatar.jpg")
+    @Schema(description = "Group avatar URL")
     private String groupAvatar;
+
+    @Schema(description = "Application message")
+    private String applyInfo;
+
+    @Schema(description = "Status: 0-Pending, 1-Accepted, 2-Rejected")
+    private Integer status;
+
+    @Schema(description = "Application Type: 1-Group")
+    private Integer type;
+
+    @Schema(description = "Create Time")
+    private Long createTime;
 }

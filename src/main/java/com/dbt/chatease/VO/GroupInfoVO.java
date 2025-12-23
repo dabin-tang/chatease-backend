@@ -16,8 +16,46 @@ import java.util.List;
 @Accessors(chain = true)
 @Schema(name = "GroupInfoVO", description = "View Object containing group information and its members' details")
 public class GroupInfoVO {
-    @Schema(description = "Group information")
+    @Schema(description = "Basic Group Info")
     private GroupInfo groupInfo;
-    @Schema(description = "Group members basic information list and other details")
+
+    @Schema(description = "Group ID (Redundant for convenience)")
+    private String groupId;
+
+    @Schema(description = "Group Name")
+    private String groupName;
+
+    @Schema(description = "Group Avatar")
+    private String groupAvatar;
+
+    @Schema(description = "Group Notice")
+    private String groupNotice;
+
+    @Schema(description = "Owner ID")
+    private String ownerId;
+
+    @Schema(description = "Member Count")
+    private Integer memberCount;
+
+    @Schema(description = "Members List")
     private List<GroupMemberDTO> groupMemberDTOList;
+
+
+    public static GroupInfoVO fromEntity(GroupInfo groupInfo, List<GroupMemberDTO> members) {
+        GroupInfoVO vo = new GroupInfoVO();
+        vo.setGroupInfo(groupInfo);
+
+        if (groupInfo != null) {
+            vo.setGroupId(groupInfo.getGroupId());
+            vo.setGroupName(groupInfo.getGroupName());
+            vo.setGroupAvatar(groupInfo.getGroupAvatar());
+            vo.setGroupNotice(groupInfo.getGroupNotice());
+            vo.setOwnerId(groupInfo.getGroupOwnerId());
+        }
+
+        vo.setGroupMemberDTOList(members);
+        vo.setMemberCount(members != null ? members.size() : 0);
+
+        return vo;
+    }
 }

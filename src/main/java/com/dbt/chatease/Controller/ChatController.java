@@ -39,7 +39,7 @@ public class ChatController {
     /**
      * Mark as Read (Clear Red Dot)
      */
-    @PutMapping("/read")
+    @PostMapping("/read")
     @Operation(summary = "Mark as Read", description = "Clear unread count for a session")
     public Result markAsRead(@RequestParam String contactId) {
         return chatService.markAsRead(contactId);

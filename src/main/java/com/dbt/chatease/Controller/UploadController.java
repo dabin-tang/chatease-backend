@@ -5,113 +5,69 @@ import com.dbt.chatease.Utils.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.UUID;
 
 @Slf4j
 @RestController
-@RequestMapping("upload")
-@Tag(name = "UploadController", description = "APIs for uploading and deleting images")
+@RequestMapping("/upload")
+@Tag(name = "UploadController", description = "APIs for uploading files")
 public class UploadController {
-    //Base storage directory (Should ideally be in application.yml)
-    private static final String BASE_STORE_DIR = "C:\\imgStore";
 
-    //Sub-directories
-    private static final String IMG_DIR = "/chateaseimg";
-    private static final String FILE_DIR = "/chateasefile";
+    @Value("${file.upload-dir:C:\\imgStore}")
+    private String baseUploadDir;
 
-    /**
-     * Upload Image
-     */
-    @PostMapping("blog")
-    @Operation(summary = "Upload Image", description = "Upload an image file (returns URL)")
-    public Result uploadImage(@RequestParam("file") MultipartFile image) {
-        //Reuse handleUpload logic, targeting the image directory
-        return handleUpload(image, IMG_DIR);
-    }
+    @Value("${server.port:8081}")
+    private String serverPort;
 
     /**
-     * Upload Generic File
+     * General File Upload
      */
-    @PostMapping("/file")
-    @Operation(summary = "Upload Generic File", description = "Upload video, audio or other files")
+    @PostMapping
+    @Operation(summary = "Upload File", description = "Upload a file and return static URL")
     public Result uploadFile(@RequestParam("file") MultipartFile file) {
-        return handleUpload(file, FILE_DIR);
-    }
-
-    /**
-     * Delete File
-     */
-    @GetMapping("/blog/delete")
-    @Operation(summary = "Delete File", description = "Delete a previously uploaded file by filename/path")
-    public Result deleteFile(@RequestParam("name") String filename) {
-        //Remove URL prefix "/files"
-        String relativePath = filename.replace("/files", "").replace("/", "\\");
-
-        //Construct path
-        File file = new File(BASE_STORE_DIR + relativePath);
-
-        if (file.isDirectory() || !file.exists()) {
-            return Result.fail("File does not exist or path is invalid");
+        if (file.isEmpty()) {
+            return Result.fail("File is empty");
         }
+
         try {
-            boolean deleted = file.delete();
-            if (deleted) {
-                log.info("File deleted successfully: {}", file.getAbsolutePath());
-                return Result.ok("File deleted successfully");
-            } else {
-                return Result.fail("Failed to delete file");
+            // Generate date-based sub-directory (e.g., /2025/12/21/)
+            String datePath = new SimpleDateFormat("/yyyy/MM/dd/").format(new Date());
+
+            //Ensure directory exists: C:\imgStore\2025\12\21\
+            File saveDir = new File(baseUploadDir + datePath);
+            if (!saveDir.exists()) {
+                saveDir.mkdirs();
             }
-        } catch (Exception e) {
-            log.error("Exception during file deletion", e);
-            return Result.fail("Deletion error: " + e.getMessage());
-        }
-    }
 
-
-    private Result handleUpload(MultipartFile file, String subDir) {
-        try {
+            //Generate unique filename
             String originalFilename = file.getOriginalFilename();
             String suffix = "";
             if (originalFilename != null && originalFilename.lastIndexOf('.') != -1) {
                 suffix = originalFilename.substring(originalFilename.lastIndexOf('.'));
             }
+            String newFileName = UUID.randomUUID().toString() + suffix;
 
-            // 1. Generate unique filename
-            String fileName = UUID.randomUUID().toString() + suffix;
+            //Save file to disk
+            File dest = new File(saveDir, newFileName);
+            file.transferTo(dest);
 
-            // 2. Generate date directory (e.g., /2023/11/28/)
-            String datePath = new SimpleDateFormat("/yyyy/MM/dd/").format(new Date());
+            //Generate Access URL
+            String fileUrl = "http://localhost:" + serverPort + "/files" + datePath + newFileName;
 
-            //3. Construct full disk path: C:\imgStore\chateaseimg\2023\11\28\ uuid.jpg
-            String savePathStr = BASE_STORE_DIR + subDir + datePath;
-            File saveDir = new File(savePathStr);
-
-            if (!saveDir.exists()) {
-                saveDir.mkdirs(); // Create directories recursively
-            }
-
-            //4. Save file
-            File destFile = new File(saveDir, fileName);
-            file.transferTo(destFile);
-
-            //5. Return Web Access URL (Matches WebConfig mapping)
-            //Format: /files/chateaseimg/2023/11/28/uuid.jpg
-            String urlPath = "/files" + subDir + datePath + fileName;
-
-            log.info("File upload success: {} -> {}", originalFilename, destFile.getAbsolutePath());
-            return Result.ok(urlPath);
+            log.info("File uploaded successfully: {}", dest.getAbsolutePath());
+            return Result.ok(fileUrl);
 
         } catch (IOException e) {
             log.error("Upload failed", e);
-            throw new RuntimeException("File upload failed", e);
+            return Result.fail("Upload failed: " + e.getMessage());
         }
     }
 }

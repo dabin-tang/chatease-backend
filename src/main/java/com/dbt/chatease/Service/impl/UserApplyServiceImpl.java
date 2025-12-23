@@ -47,7 +47,7 @@ public class UserApplyServiceImpl implements UserApplyService {
         String nickName = UserContext.getCurrentUser().getNickName();
         String contactId = userApplyDTO.getContactId();
         String defaultRequestMessage = "";
-        if (userApplyDTO.getContactId().length() != 12) {
+        if (!StringUtils.hasText(contactId)) {
             throw new IllegalArgumentException(Constants.INVALID_CONTACT_ID);
         }
         //set default message if none provided
@@ -159,9 +159,28 @@ public class UserApplyServiceImpl implements UserApplyService {
     public Result getReceivedFriendRequests(Integer page, Integer pageSize) {
         String currentUserId = UserContext.getCurrentUserId();
         Pageable pageable = PageRequest.of(page - 1, pageSize);
-
-        Page<FriendRequestVO> resultPage = userApplyRepository.findFriendRequestsWithUserInfo(currentUserId, pageable);
-        return Result.ok(resultPage.getContent(), resultPage.getTotalElements());
+        //Get Entity list
+        Page<UserApply> applyPage = userApplyRepository.findByReceiveUserIdAndContactTypeOrderByLastApplyTimeDesc(
+                currentUserId, 0, pageable);
+        //Convert to VO
+        List<FriendRequestVO> voList = applyPage.getContent().stream().map(apply -> {
+            FriendRequestVO vo = new FriendRequestVO();
+            vo.setApplyId(apply.getApplyId());
+            vo.setApplicantId(apply.getApplyUserId());
+            vo.setTargetId(apply.getReceiveUserId());
+            vo.setApplyInfo(apply.getApplyInfo());
+            vo.setStatus(apply.getStatus());
+            vo.setType(0);
+            vo.setCreateTime(apply.getLastApplyTime());
+            //Get applicant info
+            userInfoRepository.findById(apply.getApplyUserId()).ifPresent(u -> {
+                vo.setApplicantName(u.getNickName());
+                vo.setApplicantAvatar(u.getAvatar());
+            });
+            if (vo.getApplicantName() == null) vo.setApplicantName("Unknown User");
+            return vo;
+        }).collect(Collectors.toList());
+        return Result.ok(voList, applyPage.getTotalElements());
     }
 
     @Override
@@ -169,8 +188,34 @@ public class UserApplyServiceImpl implements UserApplyService {
         String currentUserId = UserContext.getCurrentUserId();
         Pageable pageable = PageRequest.of(page - 1, pageSize);
 
-        Page<GroupRequestVO> resultPage = userApplyRepository.findGroupRequestsWithInfo(currentUserId, pageable);
-        return Result.ok(resultPage.getContent(), resultPage.getTotalElements());
+        //Get UserApply list for group requests
+        Page<UserApply> applyPage = userApplyRepository.findByReceiveUserIdAndContactTypeOrderByLastApplyTimeDesc(
+                currentUserId, 1, pageable);
+        //Convert to VO
+        List<GroupRequestVO> voList = applyPage.getContent().stream().map(apply -> {
+            GroupRequestVO vo = new GroupRequestVO();
+            vo.setApplyId(apply.getApplyId());
+            vo.setApplicantId(apply.getApplyUserId());
+            vo.setApplyInfo(apply.getApplyInfo());
+            vo.setStatus(apply.getStatus());
+            vo.setType(1);
+            vo.setCreateTime(apply.getLastApplyTime());
+            //Get applicant info
+            userInfoRepository.findById(apply.getApplyUserId()).ifPresent(u -> {
+                vo.setApplicantName(u.getNickName());
+                vo.setApplicantAvatar(u.getAvatar());
+            });
+            //Get group info
+            groupInfoRepository.findById(apply.getContactId()).ifPresent(g -> {
+                vo.setGroupId(g.getGroupId());
+                vo.setGroupName(g.getGroupName());
+                vo.setGroupAvatar(g.getGroupAvatar());
+            });
+            if (vo.getApplicantName() == null) vo.setApplicantName("Unknown User");
+            if (vo.getGroupName() == null) vo.setGroupName("Unknown Group");
+            return vo;
+        }).collect(Collectors.toList());
+        return Result.ok(voList, applyPage.getTotalElements());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -295,11 +340,12 @@ public class UserApplyServiceImpl implements UserApplyService {
 
 
     /**
-     * Send system/notification message and save to DB + Update Sessions
-     * @param senderId Sender ID (or "SYSTEM")
-     * @param receiverId Receiver ID (User ID or Group ID)
+     * Send system/notification message and Update Sessions
+     *
+     * @param senderId    Sender ID (or "SYSTEM")
+     * @param receiverId  Receiver ID (User ID or Group ID)
      * @param contactType 0: Personal, 1: Group
-     * @param content Message content
+     * @param content     Message content
      */
     private void sendAndSaveMessage(String senderId, String receiverId, Integer contactType, String content) {
         //Construct Message
@@ -310,9 +356,8 @@ public class UserApplyServiceImpl implements UserApplyService {
             Arrays.sort(ids);
             sessionId = ids[0] + "_" + ids[1];
         } else {
-            sessionId = receiverId; // GroupID
+            sessionId = receiverId; //GroupID
         }
-
         //Personal Text (for welcome msg), 5: System Notification (for group join)
         int messageType = (contactType == 0) ? 0 : 5;
         msg.setSessionId(sessionId)
@@ -321,7 +366,7 @@ public class UserApplyServiceImpl implements UserApplyService {
                 .setContactType(contactType)
                 .setMessageType(messageType)
                 .setContent(content)
-                .setStatus(1) // Sent
+                .setStatus(1) //Sent
                 .setSendTime(System.currentTimeMillis());
         chatMessageRepository.save(msg);
 
@@ -329,8 +374,8 @@ public class UserApplyServiceImpl implements UserApplyService {
         if (contactType == 0) {
             //Personal Chat
             //Update both parties' session lists
-            updateSessionForUser(senderId, receiverId, content, msg.getSendTime(), contactType);
-            updateSessionForUser(receiverId, senderId, content, msg.getSendTime(), contactType);
+            updateSessionForUser(senderId, receiverId, content, msg.getSendTime(), contactType, sessionId);
+            updateSessionForUser(receiverId, senderId, content, msg.getSendTime(), contactType, sessionId);
 
             //Push to receiver
             chatWebSocketHandler.sendSystemNotification(receiverId, msg);
@@ -342,11 +387,9 @@ public class UserApplyServiceImpl implements UserApplyService {
 
             for (UserContact member : members) {
                 String memberId = member.getUserId();
-
-                //Update Session for EACH member
-                updateSessionForUser(memberId, receiverId, content, msg.getSendTime(), contactType);
-
-                //Push WebSocket to EACH member (except sender if it's a real user, but here we push to all for system msg)
+                //Update Session for each member
+                updateSessionForUser(memberId, receiverId, content, msg.getSendTime(), contactType, sessionId);
+                //Push WebSocket to each member (
                 chatWebSocketHandler.sendSystemNotification(memberId, msg);
             }
         }
@@ -355,7 +398,7 @@ public class UserApplyServiceImpl implements UserApplyService {
     /**
      * update or create a ChatSession
      */
-    private void updateSessionForUser(String userId, String contactId, String content, Long time, Integer type) {
+    private void updateSessionForUser(String userId, String contactId, String content, Long time, Integer type, String sessionId) {
         ChatSession session = chatSessionRepository.findByUserIdAndContactId(userId, contactId);
         if (session == null) {
             //Create new session if not exists
@@ -363,9 +406,10 @@ public class UserApplyServiceImpl implements UserApplyService {
             session.setUserId(userId);
             session.setContactId(contactId);
             session.setContactType(type);
-            session.setUnreadCount(0); // Initial unread count
-
-            //Fill basic info (Avatar/Name) to avoid blank session on UI
+            //Set the Session ID!!!!!!
+            session.setSessionId(sessionId);
+            session.setUnreadCount(0); //unread count
+            //Fill basic info
             if (type == 0) {
                 //Get Friend Info
                 var userOpt = userInfoRepository.findById(contactId);
@@ -382,10 +426,11 @@ public class UserApplyServiceImpl implements UserApplyService {
                 }
             }
         }
-
         //Update latest message info
         session.setLastMessage(content);
         session.setLastReceiveTime(time);
+        //Ensure sessionId is consistent
+        session.setSessionId(sessionId);
         chatSessionRepository.save(session);
     }
 

@@ -38,30 +38,27 @@ public class UserContactServiceImpl implements UserContactService {
             return Result.fail(Constants.CONTACT_ID_EMPTY);
         }
         String currentUserId = UserContext.getCurrentUserId();
-
-        // Check if contactId is a user or a group by its prefix
+        //Check if contactId is a user or a group by its prefix
         if (contactId.startsWith("UID")) {
             UserInfo userInfo = userInfoRepository.findById(contactId).
                     orElseThrow(() -> new IllegalArgumentException(Constants.NO_MATCHING_CONTACT));
 
-            // Check if user is searching for themselves
-            if (contactId.equals(currentUserId)) {
-                UserInfoVO userInfoVO = new UserInfoVO();
-                BeanUtils.copyProperties(userInfo, userInfoVO);
-                userInfoVO.setIsFriend(null);
-                return Result.ok(userInfoVO);
-            }
-
-            boolean isFriend = userContactRepository.existsByUserIdAndContactIdAndContactType(currentUserId, contactId, 0);
             UserInfoVO userInfoVO = new UserInfoVO();
             BeanUtils.copyProperties(userInfo, userInfoVO);
-            userInfoVO.setIsFriend(isFriend);
-            return Result.ok(userInfoVO);
 
+            //Check if user is searching for themselves
+            if (contactId.equals(currentUserId)) {
+                userInfoVO.setIsMe(true);
+                userInfoVO.setIsFriend(null);
+            } else {
+                userInfoVO.setIsMe(false);
+                boolean isFriend = userContactRepository.existsByUserIdAndContactIdAndContactType(currentUserId, contactId, 0);
+                userInfoVO.setIsFriend(isFriend);
+            }
+            return Result.ok(userInfoVO);
         } else if (contactId.startsWith("GID")) {
             GroupInfo groupInfo = groupInfoRepository.findById(contactId).
                     orElseThrow(() -> new IllegalArgumentException(Constants.NO_MATCHING_CONTACT));
-
             boolean isMember = userContactRepository.existsByUserIdAndContactIdAndContactType(currentUserId, contactId, 1);
             GroupBasicVO groupBasicVO = new GroupBasicVO();
             BeanUtils.copyProperties(groupInfo, groupBasicVO);
@@ -78,43 +75,54 @@ public class UserContactServiceImpl implements UserContactService {
             throw new IllegalArgumentException(Constants.INVALID_CONTACT_TYPE);
         }
         String currentUserId = UserContext.getCurrentUserId();
-
-        // Get Friend Contacts
+        //Get Friend Contacts
         if (Integer.valueOf(0).equals(contactType)) {
             //Get friend list
             List<ContactVO> friends = new ArrayList<>(userContactRepository.findFriendContacts(currentUserId));
+            //Get Robot UID from settings
+            String robotUid = sysSettingRepository.findById("ROBOT_UID")
+                    .map(SysSetting::getSettingValue).orElse("UID_ROBOT_001");
+            //Get existing relation
+            UserRobotRelation relation = userRobotRelationRepository.findByUserIdAndRobotId(currentUserId, robotUid);
 
-            List<UserRobotRelation> robotRelations = userRobotRelationRepository.findByUserIdAndStatus(currentUserId, 1);
-            if (!robotRelations.isEmpty()) {
-                UserRobotRelation relation = robotRelations.get(0);
-
-                //Get Robot Info from settings or use defaults
+            if (relation == null) {
+                log.info("Bug, Robot relation missing for user {},", currentUserId);
+                relation = new UserRobotRelation()
+                        .setUserId(currentUserId)
+                        .setRobotId(robotUid)
+                        .setStatus(1)
+                        .setCreateTime(LocalDateTime.now())
+                        .setLastReadTime(0L);
+                try {
+                    userRobotRelationRepository.save(relation);
+                } catch (Exception e) {
+                    log.error("Failed to repair robot relation", e);
+                }
+            }
+            //Construct Robot VO and add to the top of the list
+            if (relation != null) {
                 String robotNick = sysSettingRepository.findById("ROBOT_NICKNAME")
-                        .map(SysSetting::getSettingValue).orElse("ChatEase Helper");
+                        .map(SysSetting::getSettingValue).orElse("ChatEase");
                 String robotAvatar = sysSettingRepository.findById("ROBOT_AVATAR")
                         .map(SysSetting::getSettingValue).orElse("https://api.dicebear.com/7.x/bottts/png?seed=default");
 
-                // Construct Robot VO
                 ContactVO robotVO = new ContactVO();
                 robotVO.setNickName(robotNick);
                 robotVO.setAvatar(robotAvatar);
 
                 UserContact uc = new UserContact();
                 uc.setUserId(currentUserId);
-                uc.setContactId(relation.getRobotId());
+                uc.setContactId(robotUid);
                 uc.setContactType(0);
                 uc.setStatus(1);
                 uc.setCreateTime(relation.getCreateTime());
                 robotVO.setUserContact(uc);
-
-                //Add Robot to the top of the list
+                //Add Robot to the top
                 friends.add(0, robotVO);
             }
-
             return Result.ok(friends);
-
         } else if (Integer.valueOf(1).equals(contactType)) {
-            //Get Group Contacts
+            // Get Group Contacts
             List<ContactVO> groups = userContactRepository.findGroupContacts(currentUserId);
             return Result.ok(groups);
         }
@@ -158,5 +166,5 @@ public class UserContactServiceImpl implements UserContactService {
         }
     }
 
-    
+
 }

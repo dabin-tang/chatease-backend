@@ -6,16 +6,11 @@ import com.dbt.chatease.DTO.UserInfoDTO;
 import com.dbt.chatease.DTO.UserInfoUpdateDTO;
 import com.dbt.chatease.DTO.UserLoginDTO;
 import com.dbt.chatease.DTO.UserRegisterDTO;
-import com.dbt.chatease.Entity.ChatMessage;
-import com.dbt.chatease.Entity.SysSetting;
-import com.dbt.chatease.Entity.UserInfo;
-import com.dbt.chatease.Entity.UserRobotRelation;
-import com.dbt.chatease.Repository.ChatMessageRepository;
-import com.dbt.chatease.Repository.SysSettingRepository;
-import com.dbt.chatease.Repository.UserInfoRepository;
-import com.dbt.chatease.Repository.UserRobotRelationRepository;
+import com.dbt.chatease.Entity.*;
+import com.dbt.chatease.Repository.*;
 import com.dbt.chatease.Service.UserInfoService;
 import com.dbt.chatease.Utils.*;
+import com.dbt.chatease.VO.UserInfoVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.validator.routines.EmailValidator;
@@ -45,6 +40,7 @@ public class UserInfoServiceImpl implements UserInfoService {
     private final SysSettingRepository sysSettingRepo;
     private final UserRobotRelationRepository userRobotRelationRepo;
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatSessionRepository chatSessionRepository;
 
     private String generateCode() {
         int code = 100000 + new Random().nextInt(900000);
@@ -123,11 +119,15 @@ public class UserInfoServiceImpl implements UserInfoService {
         userInfoRepository.save(userInfo);
         log.info("User registered successfully with email: {}", email);
 
-
-        //TODO：Create a ChatEase robot friend(Done)
         //Get robot settings
         String robotUid = sysSettingRepo.findById("ROBOT_UID")
                 .map(SysSetting::getSettingValue).orElse("UID_ROBOT_001");
+
+        String robotNick = sysSettingRepo.findById("ROBOT_NICKNAME")
+                .map(SysSetting::getSettingValue).orElse("ChatEase Helper");
+
+        String robotAvatar = sysSettingRepo.findById("ROBOT_AVATAR")
+                .map(SysSetting::getSettingValue).orElse("https://api.dicebear.com/7.x/bottts/png?seed=default");
 
         String welcomeMsg = sysSettingRepo.findById("ROBOT_WELCOME")
                 .map(SysSetting::getSettingValue).orElse("Welcome to ChatEase!");
@@ -142,7 +142,7 @@ public class UserInfoServiceImpl implements UserInfoService {
 
         userRobotRelationRepo.save(relation);
 
-        //Send welcome private message
+        //Send welcome private message (History)
         ChatMessage msg = new ChatMessage();
         String[] ids = {userInfo.getUserId(), robotUid};
         Arrays.sort(ids);
@@ -156,6 +156,22 @@ public class UserInfoServiceImpl implements UserInfoService {
         msg.setStatus(1);
         msg.setSendTime(System.currentTimeMillis());
         chatMessageRepository.save(msg);
+
+        ChatSession userSession = new ChatSession();
+        String[] sessionIds = {userInfo.getUserId(), robotUid};
+        Arrays.sort(sessionIds);
+        String calculatedSessionId = sessionIds[0] + "_" + sessionIds[1];
+        userSession.setSessionId(calculatedSessionId);
+        userSession.setUserId(userInfo.getUserId());
+        userSession.setContactId(robotUid);
+        userSession.setContactType(0);
+        userSession.setContactName(robotNick);
+        userSession.setContactAvatar(robotAvatar);
+        userSession.setLastMessage(welcomeMsg);
+        userSession.setLastReceiveTime(msg.getSendTime());
+        userSession.setUnreadCount(1);
+
+        chatSessionRepository.save(userSession);
 
     }
 
@@ -206,13 +222,16 @@ public class UserInfoServiceImpl implements UserInfoService {
 
     @Override
     public Result getCurrentUserInfo() {
-        //Get current user ID
+        // Get current user ID
         String currentUserId = UserContext.getCurrentUserId();
         UserInfo userInfo = userInfoRepository.findById(currentUserId).
                 orElseThrow(() -> new IllegalArgumentException(Constants.USER_NOT_FOUND));
-        UserInfoDTO userInfoDTO = new UserInfoDTO();
-        BeanUtils.copyProperties(userInfo, userInfoDTO);
-        return Result.ok(userInfoDTO);
+        UserInfoVO userInfoVO = new UserInfoVO();
+        BeanUtils.copyProperties(userInfo, userInfoVO);
+        if (userInfoVO.getSex() == null) {
+            userInfoVO.setSex(0);
+        }
+        return Result.ok(userInfoVO);
     }
 
     @Transactional(rollbackFor = Exception.class)

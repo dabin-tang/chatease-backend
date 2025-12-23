@@ -82,9 +82,9 @@ public class GroupInfoController {
      * @param groupId ID of the group
      * @return group information and list of members
      */
-    @GetMapping("/members/{groupId}")
+    @GetMapping("/members")
     @Operation(summary = "Get Group Info with Members by ID", description = "Get group information along with its members by group ID.")
-    public Result getGroupInfoWithMembersByGroupId(@PathVariable String groupId) {
+    public Result getGroupInfoWithMembersByGroupId(@RequestParam String groupId) {
         log.info("Get Group Info with Members by ID: {}", groupId);
         return groupInfoService.getGroupInfoWithMembersByGroupId(groupId);
     }

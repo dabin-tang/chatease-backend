@@ -71,7 +71,7 @@ public class UserInfoController {
      * @return user information
      */
     @Operation(summary = "Get Current User Info", description = "Get information of the currently logged-in user")
-    @GetMapping("/current-user")
+    @GetMapping("/current")
     public Result getCurrentUserInfo() {
         log.info("get current user info");
         return userInfoService.getCurrentUserInfo();
@@ -84,7 +84,7 @@ public class UserInfoController {
      * @return success or fail
      */
     @Operation(summary = "Update Current User Info", description = "Update information of the currently logged-in user")
-    @PutMapping("/update-current-user")
+    @PutMapping("/update")
     public Result updateCurrentUserInfo(@RequestBody UserInfoUpdateDTO userInfoUpdateDTO) {
         log.info("update current user info: {}", userInfoUpdateDTO);
         return userInfoService.updateCurrentUserInfo(userInfoUpdateDTO);

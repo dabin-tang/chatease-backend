@@ -92,14 +92,28 @@ public class GroupInfoServiceImpl implements GroupInfoService {
         String currentUserId = UserContext.getCurrentUserId();
         GroupInfo groupInfo = groupInfoRepository.findById(groupInfoDTO.getGroupId()).
                 orElseThrow(() -> new IllegalArgumentException(Constants.GROUP_NOT_FOUND));
+
         if (!groupInfo.getGroupOwnerId().equals(currentUserId)) {
             return Result.fail(Constants.ONLY_GROUP_OWNER_CAN_MODIFY);
         }
-        //update all fields except groupId
-        groupInfoRepository.updateGroupInfo(groupInfoDTO);
 
-        //TODO: Send a WebSocket message on group name update.
-        return Result.ok(Constants.GROUPINFO_SUCCESS_UPDATE);
+        //Validation for name length if provided
+        if (groupInfoDTO.getGroupName() != null && groupInfoDTO.getGroupName().length() > 20) {
+            return Result.fail(Constants.GROUP_NAME_TOO_LONG);
+        }
+        //Validation for notice length if provided
+        if (groupInfoDTO.getGroupNotice() != null && groupInfoDTO.getGroupNotice().length() > 500) {
+            return Result.fail(Constants.GROUP_NOTICE_TOO_LONG);
+        }
+
+        //update all fields using the custom repository query
+        int rows = groupInfoRepository.updateGroupInfo(groupInfoDTO);
+
+        if (rows > 0) {
+            return Result.ok(Constants.GROUPINFO_SUCCESS_UPDATE);
+        } else {
+            return Result.fail("Update failed");
+        }
     }
 
     @Override
@@ -131,10 +145,23 @@ public class GroupInfoServiceImpl implements GroupInfoService {
 
     @Override
     public Result getGroupInfoWithMembersByGroupId(String groupId) {
+        //Get basic group info to check owner ID
         GroupInfo groupInfo = this.getGroupInfo(groupId);
+        //Get the member list from repository
         List<GroupMemberDTO> members = userContactRepository.findGroupMembersWithUserInfo(groupId);
-        GroupInfoVO groupInfoVO = new GroupInfoVO(groupInfo, members);
-        return Result.ok(groupInfoVO);
+        String ownerId = groupInfo.getGroupOwnerId();
+        if (members != null && !members.isEmpty()) {
+            for (GroupMemberDTO member : members) {
+                String memberUserId = member.getUserContact().getUserId();
+                member.setUserId(memberUserId);
+                if (ownerId != null && ownerId.equals(memberUserId)) {
+                    member.setRole(0); //Owner
+                } else {
+                    member.setRole(3); //Member
+                }
+            }
+        }
+        return Result.ok(members);
     }
 
 
@@ -156,7 +183,7 @@ public class GroupInfoServiceImpl implements GroupInfoService {
             List<UserContact> candidates = userContactRepository.findEarliestMembers(
                     groupId, currentUserId, PageRequest.of(0, 1));
             if (candidates.isEmpty()) {
-                //I am the last person -> Disband the group
+                //I am the last person: Disband the group
                 return this.disbandGroup(groupId);
             } else {
                 //Transfer ownership
