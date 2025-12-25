@@ -9,7 +9,6 @@ import lombok.experimental.Accessors;
 @Table(name = "chat_message")
 @Accessors(chain = true)
 public class ChatMessage {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "message_id")
@@ -97,4 +96,11 @@ public class ChatMessage {
      */
     @Column(name = "send_time")
     private Long sendTime;
+
+    /**
+     * Error message for frontend display (Not saved to DB)
+     */
+    @Transient
+    private String errorMsg;
+
 }

@@ -2,10 +2,7 @@ package com.dbt.chatease.Service.impl;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
-import com.dbt.chatease.DTO.UserInfoDTO;
-import com.dbt.chatease.DTO.UserInfoUpdateDTO;
-import com.dbt.chatease.DTO.UserLoginDTO;
-import com.dbt.chatease.DTO.UserRegisterDTO;
+import com.dbt.chatease.DTO.*;
 import com.dbt.chatease.Entity.*;
 import com.dbt.chatease.Repository.*;
 import com.dbt.chatease.Service.UserInfoService;
@@ -49,24 +46,33 @@ public class UserInfoServiceImpl implements UserInfoService {
 
     @Override
     @Async
-    public void sendVerificationCode(String email) {
+    public void sendVerificationCode(String email, Integer type) {
         if (!emailValidator.isValid(email)) {
             log.warn("Verification code failed: Invalid email: {}", email);
             throw new IllegalArgumentException(Constants.INVALID_EMAIL);
         }
-
+        //Check email existence based on type
+        boolean emailExists = userInfoRepository.existsByEmail(email);
+        if (type == 0) {// Register
+            if (emailExists) {
+                throw new IllegalArgumentException(Constants.ACCOUNT_EXISTS);
+            }
+        } else if (type == 1) { //Forgot Password
+            if (!emailExists) {
+                throw new IllegalArgumentException(Constants.USER_NOT_FOUND);
+            }
+        } else {
+            throw new IllegalArgumentException(Constants.UNKNOWN_ERROR);
+        }
         String code = generateCode();
         log.info("Generated verification code: {} for email: {}", code, email);
-
         try {
-            //Send email
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(email);
             message.setSubject("Verification Code From ChatEase");
             message.setText("Your verification code is: " + code + "\nIt will expire in 5 minutes");
             mailSender.send(message);
 
-            //Store in Redis, expire in 5 minutes
             redisTemplate.opsForValue().set(Constants.VERIFICATION_CODE_PREFIX + email, code, 5, TimeUnit.MINUTES);
         } catch (MailException e) {
             log.error("Failed to send verification code to email: {}", email, e);
@@ -285,9 +291,35 @@ public class UserInfoServiceImpl implements UserInfoService {
         log.info("Logging out userId: {}", currentUserId);
         userInfoRepository.updateLogoutTime(currentUserId, System.currentTimeMillis());
         //TODO: Close WebSocket connection
-
         return Result.ok(Constants.LOGOUT_SUCCESS);
+    }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result resetPassword(UserPasswordResetDTO dto) {
+        String email = dto.getEmail();
+        String code = dto.getCode();
+        String newPassword = dto.getNewPassword();
+        //Verify Code
+        String cacheCode = redisTemplate.opsForValue().get(Constants.VERIFICATION_CODE_PREFIX + email);
+        if (cacheCode == null || !cacheCode.equals(code)) {
+            return Result.fail(Constants.INVALID_CODE);
+        }
+        //Validate Password format
+        if (newPassword.length() < 6 || newPassword.length() > 60) {
+            return Result.fail(Constants.PASSWORD_TOO_SHORT);
+        }
+        //Find User
+        UserInfo userInfo = userInfoRepository.findByEmail(email);
+        if (userInfo == null) {
+            return Result.fail(Constants.USER_NOT_FOUND);
+        }
+        //Update Password
+        userInfo.setPassword(PasswordUtil.hashPassword(newPassword));
+        userInfoRepository.save(userInfo);
+        //Remove Code from cache
+        redisTemplate.delete(Constants.VERIFICATION_CODE_PREFIX + email);
+        return Result.ok("Password reset successfully");
     }
 
 

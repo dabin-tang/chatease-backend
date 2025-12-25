@@ -16,6 +16,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,38 +43,35 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         log.info("WebSocket Connection : " + session.getRemoteAddress());
-
         String token = getTokenFromSession(session);
         if (token == null) {
             log.error("Token is null");
             session.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
-
         boolean isValid = jwtUtil.validateToken(token);
         if (!isValid) {
             log.error("Token invalid");
             session.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
-
         String userId = jwtUtil.getUserIdFromToken(token);
         ONLINE_USERS.put(userId, session);
         session.getAttributes().put("userId", userId);
         log.info("User Connected: {}", userId);
+        //Notify friends that I am online
+        notifyFriendsOnline(userId);
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String payload = message.getPayload();
         log.info("Received: {}", payload);
-
         String senderId = (String) session.getAttributes().get("userId");
         if (senderId == null) {
             log.error("Sender ID not found in session");
             return;
         }
-
         ChatMessage chatMessage;
         try {
             chatMessage = objectMapper.readValue(payload, ChatMessage.class);
@@ -81,27 +79,55 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             log.error("JSON Parse Error", e);
             return;
         }
-
         chatMessage.setSendUserId(senderId);
         UserInfo senderInfo = userInfoRepository.findById(senderId).orElse(null);
         if (senderInfo != null) {
             chatMessage.setSendUserAvatar(senderInfo.getAvatar());
             chatMessage.setSendUserNickName(senderInfo.getNickName());
         }
-
         String robotUid = "UID_ROBOT_001";
         log.info("Processing Message: Type={}, To={}", chatMessage.getContactType(), chatMessage.getContactId());
-
         //Security Checks
         if (chatMessage.getContactType() == 0) {
-            // Personal Chat
+            //Personal Chat
             if (!chatMessage.getContactId().equals(robotUid)) {
-                UserContact contact = userContactRepository.findByUserIdAndContactIdAndContactType(
+                //Check friendship status (My side)
+                UserContact senderContact = userContactRepository.findByUserIdAndContactIdAndContactType(
                         senderId, chatMessage.getContactId(), 0);
-
-                if (contact == null || contact.getStatus() != 1) {
-                    log.warn("Not friends. Sender: {}, Receiver: {}", senderId, chatMessage.getContactId());
+                if (senderContact == null || (senderContact.getStatus() != 1 && senderContact.getStatus() != 3)) {
+                    // Status 1: Friend, 3: Blocked by me. If neither, it's invalid/deleted.
+                    log.warn("Not friends or Deleted. Sender: {}, Receiver: {}", senderId, chatMessage.getContactId());
                     return;
+                }
+
+                //Check if I blocked them (Status 3) -> Fail
+                if (senderContact.getStatus() == 3) {
+                    log.warn("Message blocked: Sender {} has blocked Receiver {}", senderId, chatMessage.getContactId());
+
+                    // Send Failure Message Back to Sender
+                    chatMessage.setStatus(2); // Set status to 2 (Failed)
+                    chatMessage.setSendTime(System.currentTimeMillis());
+                    // Set specific error message for active block
+                    chatMessage.setErrorMsg("You have blocked this user. Cannot send message.");
+
+                    sendMessageToUser(senderId, new TextMessage(objectMapper.writeValueAsString(chatMessage)));
+                    return; // Stop processing
+                }
+
+                //Check if They blocked me -> Fail
+                UserContact receiverContact = userContactRepository.findByUserIdAndContactIdAndContactType(
+                        chatMessage.getContactId(), senderId, 0);
+                if (receiverContact != null && receiverContact.getStatus() == 3) {
+                    log.warn("Message blocked: Receiver {} has blocked Sender {}", chatMessage.getContactId(), senderId);
+
+                    //Send Failure Message Back to Sender
+                    chatMessage.setStatus(2); // Set status to 2 (Failed)
+                    chatMessage.setSendTime(System.currentTimeMillis());
+                    //Set specific error message for passive block
+                    chatMessage.setErrorMsg("You have been blocked by this user. Cannot send message.");
+
+                    sendMessageToUser(senderId, new TextMessage(objectMapper.writeValueAsString(chatMessage)));
+                    return; //Stop processing
                 }
             }
         } else {
@@ -113,30 +139,25 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
         }
-
         //Generate Session ID
         if (chatMessage.getContactType() == 0) {
             String[] ids = {senderId, chatMessage.getContactId()};
-            java.util.Arrays.sort(ids);
+            Arrays.sort(ids);
             chatMessage.setSessionId(ids[0] + "_" + ids[1]);
         } else {
             chatMessage.setSessionId(chatMessage.getContactId());
         }
-
-        //Save to Database
+        //Save to Database (Only for successful messages)
         chatMessage.setSendTime(System.currentTimeMillis());
-        chatMessage.setStatus(1);
-
+        chatMessage.setStatus(1); // Default success status
         try {
             chatMessageRepository.save(chatMessage);
             updateChatSession(chatMessage);
         } catch (Exception e) {
             log.error("Error", e);
         }
-
         //Push Message
         TextMessage textMessage = new TextMessage(objectMapper.writeValueAsString(chatMessage));
-
         if (chatMessage.getContactType() == 0) {
             //Personal Chat
             if (!chatMessage.getContactId().equals(robotUid)) {
@@ -144,7 +165,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             }
             sendMessageToUser(senderId, textMessage);
         } else {
-            // Group Chat
+            //Group Chat
             List<UserContact> members = userContactRepository.findByContactIdAndContactType(chatMessage.getContactId(), 1);
             for (UserContact member : members) {
                 sendMessageToUser(member.getUserId(), textMessage);
@@ -155,7 +176,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         String userId = (String) session.getAttributes().get("userId");
-        if (userId != null) ONLINE_USERS.remove(userId);
+        if (userId != null) {
+            ONLINE_USERS.remove(userId);
+            //Notify friends that user is offline(hidden to user, but notify system)
+            notifyFriendsOffline(userId);
+        }
         log.info("User Disconnected: {}", userId);
     }
 
@@ -248,4 +273,39 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             log.error("Failed to push system notification: {}", userId, e);
         }
     }
+
+    public static boolean isOnline(String userId) {
+        return ONLINE_USERS.containsKey(userId);
+    }
+
+    //notify friends
+    private void notifyFriendsOnline(String userId) {
+        //Find all friends of this user
+        List<UserContact> friends = userContactRepository.findByUserIdAndContactType(userId, 0); // 0 = Friend
+        //Construct notification message
+        String jsonMessage = String.format("{\"messageType\": 9, \"contactId\": \"%s\", \"content\": \"online\"}", userId);
+        TextMessage message = new TextMessage(jsonMessage);
+        for (UserContact friend : friends) {
+            //Only send to friends who are currently online
+            if (isOnline(friend.getContactId())) {
+                sendMessageToUser(friend.getContactId(), message);
+            }
+        }
+    }
+
+    //notify friends offline
+    private void notifyFriendsOffline(String userId) {
+        //Find all friends of this user
+        List<UserContact> friends = userContactRepository.findByUserIdAndContactType(userId, 0); // 0 = Friend
+        //Construct notification message
+        String jsonMessage = String.format("{\"messageType\": 10, \"contactId\": \"%s\", \"content\": \"offline\"}", userId);
+        TextMessage message = new TextMessage(jsonMessage);
+        for (UserContact friend : friends) {
+            //Only send to friends who are currently online
+            if (isOnline(friend.getContactId())) {
+                sendMessageToUser(friend.getContactId(), message);
+            }
+        }
+    }
+
 }

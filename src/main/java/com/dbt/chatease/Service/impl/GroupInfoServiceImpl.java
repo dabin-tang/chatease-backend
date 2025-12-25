@@ -2,12 +2,13 @@ package com.dbt.chatease.Service.impl;
 
 import com.dbt.chatease.DTO.GroupInfoDTO;
 import com.dbt.chatease.DTO.GroupMemberOpDTO;
+import com.dbt.chatease.Entity.*;
+import com.dbt.chatease.Handler.ChatWebSocketHandler;
+import com.dbt.chatease.Repository.ChatSessionRepository;
 import com.dbt.chatease.Repository.UserInfoRepository;
 import com.dbt.chatease.Service.ChatService;
 import com.dbt.chatease.VO.GroupInfoVO;
 import com.dbt.chatease.DTO.GroupMemberDTO;
-import com.dbt.chatease.Entity.GroupInfo;
-import com.dbt.chatease.Entity.UserContact;
 import com.dbt.chatease.Repository.GroupInfoRepository;
 import com.dbt.chatease.Repository.UserContactRepository;
 import com.dbt.chatease.Service.GroupInfoService;
@@ -35,6 +36,8 @@ public class GroupInfoServiceImpl implements GroupInfoService {
     private final UserContactRepository userContactRepository;
     private final UserInfoRepository userInfoRepository;
     private final ChatService chatService;
+    private final ChatSessionRepository chatSessionRepository;
+    private final ChatWebSocketHandler chatWebSocketHandler;
 
 
     @Override
@@ -140,7 +143,13 @@ public class GroupInfoServiceImpl implements GroupInfoService {
     public Result getGroupInfoByIdAndMemberCount(String groupId) {
         GroupInfo groupInfo = getGroupInfo(groupId);
         Long groupMemberCount = userContactRepository.countByContactIdAndContactType(groupId, 1);
-        return Result.ok(groupInfo, groupMemberCount);
+        GroupInfoVO groupInfoVO = new GroupInfoVO();
+        BeanUtils.copyProperties(groupInfo, groupInfoVO);
+        groupInfoVO.setOwnerId(groupInfo.getGroupOwnerId());
+        groupInfoVO.setJoinType(groupInfo.getJoinType());
+        groupInfoVO.setMemberCount(groupMemberCount.intValue());
+        groupInfoVO.setGroupInfo(groupInfo);
+        return Result.ok(groupInfoVO);
     }
 
     @Override
@@ -235,25 +244,41 @@ public class GroupInfoServiceImpl implements GroupInfoService {
     public Result kickMembers(GroupMemberOpDTO dto) {
         String currentUserId = UserContext.getCurrentUserId();
         String groupId = dto.getGroupId();
+        String targetUserId = dto.getTargetUserId();
         //Check Permission
         GroupInfo group = groupInfoRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException(Constants.GROUP_NOT_FOUND));
         if (!group.getGroupOwnerId().equals(currentUserId)) {
             return Result.fail(Constants.ONLY_GROUP_OWNER_CAN_MODIFY);
         }
-        //Kick Loop
-        for (String targetUserId : dto.getTargetUserIds()) {
-            if (targetUserId.equals(currentUserId)) continue; //Can't kick self
-
-            UserContact targetContact = userContactRepository.findByUserIdAndContactIdAndContactType(targetUserId, groupId, 1);
-            if (targetContact != null && targetContact.getStatus() == 1) {
-                targetContact.setStatus(3); //Blocked/Kicked (Removed by admin)
-                targetContact.setLastUpdateTime(LocalDateTime.now());
-                userContactRepository.save(targetContact);
-            }
+        //Validate target user
+        if (targetUserId == null || targetUserId.isEmpty()) {
+            return Result.fail("Target user ID is required");
         }
-
-        return Result.ok("Members removed successfully");
+        if (targetUserId.equals(currentUserId)) {
+            return Result.fail("Cannot kick yourself");
+        }
+        UserContact targetContact = userContactRepository.findByUserIdAndContactIdAndContactType(targetUserId, groupId, 1);
+        if (targetContact != null && targetContact.getStatus() == 1) {
+            //Update contact status to Kicked (3)
+            targetContact.setStatus(3);
+            targetContact.setLastUpdateTime(LocalDateTime.now());
+            userContactRepository.save(targetContact);
+            //Remove Chat Session for the kicked user
+            com.dbt.chatease.Entity.ChatSession session = chatSessionRepository.findByUserIdAndContactId(targetUserId, groupId);
+            if (session != null) {
+                chatSessionRepository.delete(session);
+            }
+            //Send Message Frontend to remove session
+            //20 is defined as Session Remove request
+            ChatMessage commandMsg = new ChatMessage();
+            commandMsg.setContactId(groupId);
+            commandMsg.setMessageType(20);
+            commandMsg.setContent("SESSION_REMOVED");
+            commandMsg.setSendTime(System.currentTimeMillis());
+            chatWebSocketHandler.sendSystemNotification(targetUserId, commandMsg);
+        }
+        return Result.ok("Member removed successfully");
     }
 
 
@@ -262,48 +287,62 @@ public class GroupInfoServiceImpl implements GroupInfoService {
     public Result addMembers(GroupMemberOpDTO dto) {
         String currentUserId = UserContext.getCurrentUserId();
         String groupId = dto.getGroupId();
-
-        //Check if I am a member
+        String targetUserId = dto.getTargetUserId();
+        //Group Check
+        GroupInfo group = groupInfoRepository.findById(groupId).orElse(null);
+        if (group == null) {
+            return Result.fail(Constants.GROUP_NOT_FOUND);
+        }
+        if (group.getStatus() == 0) {
+            return Result.fail("Group is disbanded");
+        }
+        //Permission Check (Inviter must be a member)
         boolean amIMember = userContactRepository.existsByUserIdAndContactIdAndContactType(currentUserId, groupId, 1);
         if (!amIMember) {
             return Result.fail(Constants.GROUP_ACCESS_DENIED);
         }
-
-        GroupInfo group = groupInfoRepository.findById(groupId).orElseThrow();
-        if (group.getStatus() == 0) return Result.fail("Group is disbanded");
-
-        for (String targetUserId : dto.getTargetUserIds()) {
-            //Check if user exists
-            if (!userInfoRepository.existsById(targetUserId)) continue;
-
-            UserContact targetContact = userContactRepository.findByUserIdAndContactIdAndContactType(targetUserId, groupId, 1);
-
-            if (targetContact != null) {
-                //Already was a member (maybe quit before), restore status
-                if (targetContact.getStatus() != 1) {
-                    targetContact.setStatus(1);
-                    targetContact.setLastUpdateTime(LocalDateTime.now());
-                    userContactRepository.save(targetContact);
-                }
-            } else {
-                //New member
-                UserContact newContact = new UserContact()
-                        .setUserId(targetUserId)
-                        .setContactId(groupId)
-                        .setContactType(1)
-                        .setStatus(1)
-                        .setCreateTime(LocalDateTime.now())
-                        .setLastUpdateTime(LocalDateTime.now());
-                userContactRepository.save(newContact);
-            }
-
-            //TODO: Send System Message: "xxx invited yyy to the group"(Done)
-            String addedName = userInfoRepository.findById(targetUserId).get().getNickName();
-            String inviterName = userInfoRepository.findById(currentUserId).get().getNickName();
-            chatService.sendSystemMessage("SYSTEM", groupId, 1, inviterName + " invited " + addedName + " to the group");
+        //Validate Target User Input
+        if (targetUserId == null || targetUserId.isEmpty()) {
+            return Result.fail("Target user ID is required");
         }
-
-        return Result.ok("Members added successfully");
+        //Pre-fetch Inviter Info
+        UserInfo inviter = userInfoRepository.findById(currentUserId).orElse(null);
+        if (inviter == null) {
+            return Result.fail(Constants.USER_NOT_FOUND);
+        }
+        String inviterName = inviter.getNickName();
+        //Check Target User Existence
+        UserInfo targetUser = userInfoRepository.findById(targetUserId).orElse(null);
+        if (targetUser == null) {
+            return Result.fail("Target user not found");
+        }
+        //Check Target User Group Status
+        Optional<UserContact> contactOpt = userContactRepository.findByUserIdAndContactId(targetUserId, groupId);
+        if (contactOpt.isPresent()) {
+            UserContact existingContact = contactOpt.get();
+            //Check if already in the group (Status 1 means active member)
+            if (existingContact.getStatus() == 1) {
+                return Result.fail(targetUser.getNickName() + " is already in the group");
+            }
+            //If record exists but not active
+            existingContact.setStatus(1);
+            existingContact.setContactType(1); // Ensure correct type
+            existingContact.setLastUpdateTime(LocalDateTime.now());
+            userContactRepository.save(existingContact);
+        } else {
+            //New member
+            UserContact newContact = new UserContact()
+                    .setUserId(targetUserId)
+                    .setContactId(groupId)
+                    .setContactType(1) //Group type
+                    .setStatus(1)      //Active
+                    .setCreateTime(LocalDateTime.now())
+                    .setLastUpdateTime(LocalDateTime.now());
+            userContactRepository.save(newContact);
+        }
+        //Send System Message
+        chatService.sendSystemMessage("SYSTEM", groupId, 1, inviterName + " invited " + targetUser.getNickName() + " to the group");
+        return Result.ok("Member added successfully");
     }
 
 }

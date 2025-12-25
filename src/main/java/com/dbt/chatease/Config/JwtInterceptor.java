@@ -29,6 +29,7 @@ public class JwtInterceptor implements HandlerInterceptor {
             "/user-info/login",
             "/user-info/register",
             "/user-info/sendCode",
+            "/user-info/reset-password",
 
             "/swagger-ui/**",
             "/v3/api-docs/**",

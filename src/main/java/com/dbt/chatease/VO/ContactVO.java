@@ -27,4 +27,17 @@ public class ContactVO {
 
     @Schema(description = "Group avatar URL", example = "http://example.com/group-avatar.jpg")
     private String groupAvatar;
+
+    @Schema(description = "User Online Status", example = "true")
+    private Boolean isOnline;
+
+    public ContactVO(UserContact userContact, String nickName, String avatar, String groupName, String groupAvatar) {
+        this.userContact = userContact;
+        this.nickName = nickName;
+        this.avatar = avatar;
+        this.groupName = groupName;
+        this.groupAvatar = groupAvatar;
+        this.isOnline = false;
+    }
+
 }

@@ -2,6 +2,7 @@ package com.dbt.chatease.Repository;
 
 import com.dbt.chatease.Entity.ChatMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 
@@ -12,4 +13,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
      * Find chat history by session ID, ordered by time ascending.
      */
     List<ChatMessage> findBySessionIdOrderBySendTimeAsc(String sessionId);
+
+    @Modifying
+    void deleteBySessionId(String sessionId);
 }

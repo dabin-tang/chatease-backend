@@ -2,6 +2,7 @@ package com.dbt.chatease.Service;
 
 import com.dbt.chatease.DTO.UserInfoUpdateDTO;
 import com.dbt.chatease.DTO.UserLoginDTO;
+import com.dbt.chatease.DTO.UserPasswordResetDTO;
 import com.dbt.chatease.DTO.UserRegisterDTO;
 import com.dbt.chatease.Entity.UserInfo;
 import com.dbt.chatease.Utils.Result;
@@ -11,7 +12,7 @@ public interface UserInfoService {
      *Send email verification code
      * @param email
      */
-    void sendVerificationCode(String email);
+    void sendVerificationCode(String email, Integer type);
 
     /**
      *  Register user
@@ -28,4 +29,6 @@ public interface UserInfoService {
     Result updatePassword(String password);
 
     Result logOut();
+
+    Result resetPassword(UserPasswordResetDTO userPasswordResetDTO);
 }

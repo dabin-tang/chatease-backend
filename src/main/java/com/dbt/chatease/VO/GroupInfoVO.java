@@ -34,6 +34,9 @@ public class GroupInfoVO {
     @Schema(description = "Owner ID")
     private String ownerId;
 
+    @Schema(description = "Join type: 0-Direct, 1-Approval")
+    private Integer joinType;
+
     @Schema(description = "Member Count")
     private Integer memberCount;
 
@@ -51,11 +54,11 @@ public class GroupInfoVO {
             vo.setGroupAvatar(groupInfo.getGroupAvatar());
             vo.setGroupNotice(groupInfo.getGroupNotice());
             vo.setOwnerId(groupInfo.getGroupOwnerId());
+            vo.setJoinType(groupInfo.getJoinType());
         }
-
         vo.setGroupMemberDTOList(members);
         vo.setMemberCount(members != null ? members.size() : 0);
-
         return vo;
     }
+
 }

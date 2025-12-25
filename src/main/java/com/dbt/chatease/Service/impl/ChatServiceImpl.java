@@ -155,7 +155,6 @@ public class ChatServiceImpl implements ChatService {
         } else {
             sessionId = receiverId;
         }
-
         msg.setSessionId(sessionId)
                 .setSendUserId(senderId)
                 .setContactId(receiverId)
@@ -164,16 +163,17 @@ public class ChatServiceImpl implements ChatService {
                 .setContent(content)
                 .setStatus(1)
                 .setSendTime(System.currentTimeMillis());
-
         chatMessageRepository.save(msg);
-
         if (contactType == 0) {
             updateSessionAndPush(receiverId, senderId, msg);
             updateSessionAndPush(senderId, receiverId, msg);
         } else {
             List<UserContact> members = userContactRepository.findByContactIdAndContactType(receiverId, 1);
             for (UserContact member : members) {
-                updateSessionAndPush(member.getUserId(), receiverId, msg);
+                //Only push to active members (Status == 1)
+                if (member.getStatus() == 1) {
+                    updateSessionAndPush(member.getUserId(), receiverId, msg);
+                }
             }
         }
     }
@@ -184,6 +184,7 @@ public class ChatServiceImpl implements ChatService {
             session = new ChatSession();
             session.setUserId(userId);
             session.setContactId(contactId);
+            session.setSessionId(msg.getSessionId());
             session.setContactType(msg.getContactType());
             session.setUnreadCount(0);
             if (msg.getContactType() == 0) {
@@ -205,4 +206,5 @@ public class ChatServiceImpl implements ChatService {
         chatSessionRepository.save(session);
         chatWebSocketHandler.sendSystemNotification(userId, msg);
     }
+
 }

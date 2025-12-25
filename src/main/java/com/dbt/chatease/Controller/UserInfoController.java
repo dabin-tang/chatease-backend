@@ -2,6 +2,7 @@ package com.dbt.chatease.Controller;
 
 import com.dbt.chatease.DTO.UserInfoUpdateDTO;
 import com.dbt.chatease.DTO.UserLoginDTO;
+import com.dbt.chatease.DTO.UserPasswordResetDTO;
 import com.dbt.chatease.DTO.UserRegisterDTO;
 import com.dbt.chatease.Entity.UserInfo;
 import com.dbt.chatease.Repository.UserInfoRepository;
@@ -29,13 +30,12 @@ public class UserInfoController {
      * Send email verification code
      *
      * @param email
-     *
      */
     @Operation(summary = "Send email verification code")
     @PostMapping("/sendCode")
-    public Result sendCode(@RequestParam String email) {
-        log.info("send verification code to email: {}", email);
-        userInfoService.sendVerificationCode(email);
+    public Result sendCode(@RequestParam String email, @RequestParam Integer type) {
+        log.info("send verification code to email: {}, type: {}", email, type);
+        userInfoService.sendVerificationCode(email, type);
         return Result.ok(Constants.CODE_SENT);
     }
 
@@ -112,6 +112,19 @@ public class UserInfoController {
     @PostMapping("/logout")
     public Result logOut() {
         return userInfoService.logOut();
+    }
+
+    /**
+     * Reset password
+     *
+     * @param userPasswordResetDTO Reset info
+     * @return success or fail
+     */
+    @Operation(summary = "Reset Password", description = "Reset user password using email verification code")
+    @PostMapping("/reset-password")
+    public Result resetPassword(@RequestBody UserPasswordResetDTO userPasswordResetDTO) {
+        log.info("reset password for email: {}", userPasswordResetDTO.getEmail());
+        return userInfoService.resetPassword(userPasswordResetDTO);
     }
 
 }

@@ -85,4 +85,17 @@ public class UserContactController {
         return userContactService.blockContact(contactId);
     }
 
+    /**
+     * Unblock a contact by contact ID
+     *
+     * @param contactId ID of the contact to unblock
+     * @return success or fail
+     */
+    @PostMapping("/unblock-contact")
+    @Operation(summary = "Unblock Contact", description = "Unblock a contact by contact ID")
+    public Result unblockContact(String contactId) {
+        log.info("Unblock Contact with ID: {}", contactId);
+        return userContactService.unblockContact(contactId);
+    }
+
 }

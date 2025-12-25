@@ -14,4 +14,6 @@ public interface UserContactService {
     Result deleteContact(String contactId);
 
     Result blockContact(String contactId);
+
+    Result unblockContact(String contactId);
 }

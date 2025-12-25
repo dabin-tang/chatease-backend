@@ -16,7 +16,7 @@ import java.util.List;
 @Schema(name = "GroupInfoDTO", description = "Group information DTO")
 public class GroupInfoDTO implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+    //private static final long serialVersionUID = 1L;
 
     @Schema(description = "Group ID", example = "GRP123456789")
     private String groupId;
@@ -34,6 +34,5 @@ public class GroupInfoDTO implements Serializable {
     private Integer joinType;
 
     private List<String> userIds;
-
 
 }

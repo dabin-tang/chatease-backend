@@ -1,6 +1,7 @@
 package com.dbt.chatease.Service.impl;
 
 import com.dbt.chatease.Entity.*;
+import com.dbt.chatease.Handler.ChatWebSocketHandler;
 import com.dbt.chatease.Repository.*;
 import com.dbt.chatease.Service.UserContactService;
 import com.dbt.chatease.Utils.Constants;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,7 +32,9 @@ public class UserContactServiceImpl implements UserContactService {
     private final GroupInfoRepository groupInfoRepository;
     private final UserRobotRelationRepository userRobotRelationRepository;
     private final SysSettingRepository sysSettingRepository;
-
+    private final ChatSessionRepository chatSessionRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ChatWebSocketHandler chatWebSocketHandler;
 
     @Override
     public Result searchFriendOrGroup(String contactId) {
@@ -42,24 +46,26 @@ public class UserContactServiceImpl implements UserContactService {
         if (contactId.startsWith("UID")) {
             UserInfo userInfo = userInfoRepository.findById(contactId).
                     orElseThrow(() -> new IllegalArgumentException(Constants.NO_MATCHING_CONTACT));
-
             UserInfoVO userInfoVO = new UserInfoVO();
             BeanUtils.copyProperties(userInfo, userInfoVO);
-
             //Check if user is searching for themselves
             if (contactId.equals(currentUserId)) {
                 userInfoVO.setIsMe(true);
                 userInfoVO.setIsFriend(null);
             } else {
                 userInfoVO.setIsMe(false);
-                boolean isFriend = userContactRepository.existsByUserIdAndContactIdAndContactType(currentUserId, contactId, 0);
+                //Get the contact and check if status is 1 (Friend)
+                UserContact contact = userContactRepository.findByUserIdAndContactIdAndContactType(currentUserId, contactId, 0);
+                boolean isFriend = (contact != null && contact.getStatus() == 1);
                 userInfoVO.setIsFriend(isFriend);
             }
             return Result.ok(userInfoVO);
         } else if (contactId.startsWith("GID")) {
             GroupInfo groupInfo = groupInfoRepository.findById(contactId).
                     orElseThrow(() -> new IllegalArgumentException(Constants.NO_MATCHING_CONTACT));
-            boolean isMember = userContactRepository.existsByUserIdAndContactIdAndContactType(currentUserId, contactId, 1);
+            //Get the contact and check if status is 1 (Member)
+            UserContact contact = userContactRepository.findByUserIdAndContactIdAndContactType(currentUserId, contactId, 1);
+            boolean isMember = (contact != null && contact.getStatus() == 1);
             GroupBasicVO groupBasicVO = new GroupBasicVO();
             BeanUtils.copyProperties(groupInfo, groupBasicVO);
             groupBasicVO.setIsMember(isMember);
@@ -79,12 +85,20 @@ public class UserContactServiceImpl implements UserContactService {
         if (Integer.valueOf(0).equals(contactType)) {
             //Get friend list
             List<ContactVO> friends = new ArrayList<>(userContactRepository.findFriendContacts(currentUserId));
+            //Get online status
+            for (ContactVO vo : friends) {
+                if (vo.getUserContact() != null) {
+                    String contactId = vo.getUserContact().getContactId();
+                    // Check static map in WebSocketHandler
+                    boolean isOnline = ChatWebSocketHandler.isOnline(contactId);
+                    vo.setIsOnline(isOnline);
+                }
+            }
             //Get Robot UID from settings
             String robotUid = sysSettingRepository.findById("ROBOT_UID")
                     .map(SysSetting::getSettingValue).orElse("UID_ROBOT_001");
             //Get existing relation
             UserRobotRelation relation = userRobotRelationRepository.findByUserIdAndRobotId(currentUserId, robotUid);
-
             if (relation == null) {
                 log.info("Bug, Robot relation missing for user {},", currentUserId);
                 relation = new UserRobotRelation()
@@ -99,7 +113,6 @@ public class UserContactServiceImpl implements UserContactService {
                     log.error("Failed to repair robot relation", e);
                 }
             }
-            //Construct Robot VO and add to the top of the list
             if (relation != null) {
                 String robotNick = sysSettingRepository.findById("ROBOT_NICKNAME")
                         .map(SysSetting::getSettingValue).orElse("ChatEase");
@@ -109,7 +122,8 @@ public class UserContactServiceImpl implements UserContactService {
                 ContactVO robotVO = new ContactVO();
                 robotVO.setNickName(robotNick);
                 robotVO.setAvatar(robotAvatar);
-
+                //NEW: Robot is always online
+                robotVO.setIsOnline(true);
                 UserContact uc = new UserContact();
                 uc.setUserId(currentUserId);
                 uc.setContactId(robotUid);
@@ -132,12 +146,22 @@ public class UserContactServiceImpl implements UserContactService {
     @Override
     public Result getContactDetail(String contactId) {
         String currentUserId = UserContext.getCurrentUserId();
-        this.validateFriendship(currentUserId, contactId);
-        UserInfo userInfo = userInfoRepository.findById(contactId).
-                orElseThrow(() -> new IllegalArgumentException(Constants.USER_NOT_FOUND));
+        UserInfo userInfo = userInfoRepository.findById(contactId).orElse(null);
+        if (userInfo == null) {
+            return Result.fail(Constants.USER_NOT_FOUND);
+        }
         UserInfoVO userInfoVO = new UserInfoVO();
         BeanUtils.copyProperties(userInfo, userInfoVO);
-        userInfoVO.setIsFriend(true);
+        UserContact contact = userContactRepository.findByUserIdAndContactIdAndContactType(currentUserId, contactId, 0);
+        //Return detailed status info
+        if (contact != null) {
+            boolean isFriend = (contact.getStatus() == 1 || contact.getStatus() == 3); //1:Friend, 3:Blocked by me
+            userInfoVO.setIsFriend(isFriend);
+            userInfoVO.setContactStatus(contact.getStatus());
+        } else {
+            userInfoVO.setIsFriend(false);
+            userInfoVO.setContactStatus(0);
+        }
         return Result.ok(userInfoVO);
     }
 
@@ -146,17 +170,42 @@ public class UserContactServiceImpl implements UserContactService {
     public Result deleteContact(String contactId) {
         String currentUserId = UserContext.getCurrentUserId();
         this.validateFriendship(currentUserId, contactId);
+        //Delete Contact(soft delete)
         userContactRepository.updateByUserIdAndContactIdAndContactType(currentUserId, contactId, 0, 2, LocalDateTime.now());
         userContactRepository.updateByUserIdAndContactIdAndContactType(contactId, currentUserId, 0, 2, LocalDateTime.now());
+        // Delete Chat Session
+        ChatSession session = chatSessionRepository.findByUserIdAndContactId(currentUserId, contactId);
+        if (session != null) {
+            chatSessionRepository.delete(session);
+        }
+        //Delete Messages
+        String[] ids = {currentUserId, contactId};
+        Arrays.sort(ids);
+        String sessionId = ids[0] + "_" + ids[1];
+        chatMessageRepository.deleteBySessionId(sessionId);
         return Result.ok(Constants.CONTACT_DELETED);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public Result blockContact(String contactId) {
         String currentUserId = UserContext.getCurrentUserId();
         this.validateFriendship(currentUserId, contactId);
         userContactRepository.updateByUserIdAndContactIdAndContactType(currentUserId, contactId, 0, 3, LocalDateTime.now());
         return Result.ok(Constants.CONTACT_BLOCKED);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public Result unblockContact(String contactId) {
+        String currentUserId = UserContext.getCurrentUserId();
+        UserContact contact = userContactRepository.findByUserIdAndContactIdAndContactType(currentUserId, contactId, 0);
+        if (contact == null) {
+            throw new IllegalArgumentException(Constants.USER_NOT_FOUND);
+        }
+        //Restore status to 1
+        userContactRepository.updateByUserIdAndContactIdAndContactType(currentUserId, contactId, 0, 1, LocalDateTime.now());
+        return Result.ok("Contact unblocked");
     }
 
     private void validateFriendship(String userId, String contactId) {

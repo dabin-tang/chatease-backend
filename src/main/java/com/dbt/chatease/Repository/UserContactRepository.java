@@ -26,7 +26,7 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
      */
     @Query("SELECT new com.dbt.chatease.DTO.GroupMemberDTO(uc, ui.nickName, ui.avatar, ui.sex) " +
             "FROM UserContact uc JOIN UserInfo ui ON uc.userId = ui.userId " +
-            "WHERE uc.contactId = :groupId AND uc.contactType = 1 " +
+            "WHERE uc.contactId = :groupId AND uc.contactType = 1 AND uc.status = 1 " +
             "ORDER BY uc.createTime DESC")
     List<GroupMemberDTO> findGroupMembersWithUserInfo(@Param("groupId") String groupId);
 
@@ -40,7 +40,7 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
     @Query("SELECT new com.dbt.chatease.VO.ContactVO(uc, ui.nickName, ui.avatar, null, null) " +
             "FROM UserContact uc " +
             "JOIN UserInfo ui ON uc.contactId = ui.userId " +
-            "WHERE uc.userId = :userId AND uc.contactType = 0 " +
+            "WHERE uc.userId = :userId AND uc.contactType = 0 AND uc.status = 1 " +
             "ORDER BY uc.createTime DESC")
     List<ContactVO> findFriendContacts(@Param("userId") String userId);
 
@@ -50,7 +50,7 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
     @Query("SELECT new com.dbt.chatease.VO.ContactVO(uc, null, null, gi.groupName, gi.groupAvatar) " +
             "FROM UserContact uc " +
             "JOIN GroupInfo gi ON uc.contactId = gi.groupId " +
-            "WHERE uc.userId = :userId AND uc.contactType = 1 " +
+            "WHERE uc.userId = :userId AND uc.contactType = 1 AND uc.status = 1 " +
             "ORDER BY uc.createTime DESC")
     List<ContactVO> findGroupContacts(@Param("userId") String userId);
 
@@ -81,4 +81,7 @@ public interface UserContactRepository extends JpaRepository<UserContact, UserCo
             "AND uc.userId <> :excludeUserId " +
             "ORDER BY uc.createTime ASC")
     List<UserContact> findEarliestMembers(@Param("groupId") String groupId, @Param("excludeUserId") String excludeUserId, Pageable pageable);
+
+    List<UserContact> findByUserIdAndContactType(String userId, Integer contactType);
+
 }

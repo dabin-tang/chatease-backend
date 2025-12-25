@@ -68,7 +68,7 @@ public class UserApplyServiceImpl implements UserApplyService {
             }
             //Check if the target user is already a friend(Abnormal user)
             UserContact userContactForApplyUser = userContactRepository.findByUserIdAndContactIdAndContactType(applyUserId, contactId, 0);
-            if (userContactForApplyUser != null) {
+            if (userContactForApplyUser != null && (userContactForApplyUser.getStatus() == 1 || userContactForApplyUser.getStatus() == 3)) {
                 log.warn("Abnormal User {} attempted to add existing friend {}", applyUserId, contactId);
                 throw new BusinessException(Constants.USER_ALREADY_ADDED);
             }
@@ -103,7 +103,7 @@ public class UserApplyServiceImpl implements UserApplyService {
             }
             //Check if the user is already a member of the group
             UserContact userContactForApplyUser = userContactRepository.findByUserIdAndContactIdAndContactType(applyUserId, contactId, 1);
-            if (userContactForApplyUser != null) {
+            if (userContactForApplyUser != null && userContactForApplyUser.getStatus() == 1) {
                 log.warn("Abnormal User {} attempted to join existing group {}", applyUserId, contactId);
                 throw new BusinessException(Constants.GROUP_ALREADY_ADDED);
             }

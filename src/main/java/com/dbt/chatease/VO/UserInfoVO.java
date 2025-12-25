@@ -41,4 +41,7 @@ public class UserInfoVO {
 
     @Schema(description = "Is current user", example = "false")
     private Boolean isMe;
+
+    @Schema(description = "Contact Status: 0-Not Friend, 1-Friend, 2-Deleted, 3-Blocked", example = "1")
+    private Integer contactStatus;
 }
