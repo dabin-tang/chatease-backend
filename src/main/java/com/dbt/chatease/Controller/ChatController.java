@@ -27,13 +27,14 @@ public class ChatController {
     }
 
     /**
-     * Get Chat History
+     * Get Chat History (Paginated)
      */
     @GetMapping("/history")
-    @Operation(summary = "Get Chat History", description = "Get message history for a specific contact or group")
-    public Result getHistory(@RequestParam String contactId, 
-                             @RequestParam Integer contactType) {
-        return chatService.getChatHistory(contactId, contactType);
+    @Operation(summary = "Get Chat History", description = "Get paginated message history. Pass lastMessageId to load older messages.")
+    public Result getHistory(@RequestParam String contactId,
+                             @RequestParam Integer contactType,
+                             @RequestParam(required = false) Long lastMessageId) {
+        return chatService.getChatHistory(contactId, contactType, lastMessageId);
     }
 
     /**

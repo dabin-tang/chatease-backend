@@ -172,4 +172,40 @@ public class AdminController {
     public Result sendBroadcast(@RequestBody com.dbt.chatease.DTO.BroadcastDTO dto) {
         return adminService.sendBroadcast(dto);
     }
+
+    /**
+     * Get robot configuration (name, avatar, welcome message)
+     *
+     * @return robot configuration
+     */
+    @GetMapping("/robot-config")
+    @Operation(summary = "Get Robot Config", description = "Retrieve current robot name, avatar and welcome message")
+    public Result getRobotConfig() {
+        return adminService.getRobotConfig();
+    }
+
+    /**
+     * Get dashboard statistics such as total user count and group count
+     *
+     * @return dashboard stats
+     */
+    @GetMapping("/dashboard/stats")
+    @Operation(summary = "Get Dashboard Stats", description = "Retrieve total user count and group count")
+    public Result getDashboardStats() {
+        return adminService.getDashboardStats();
+    }
+
+    /**
+     * Get paginated list of broadcast history
+     *
+     * @return broadcast list
+     */
+    @GetMapping("/broadcast/list")
+    @Operation(summary = "Get Broadcast List", description = "Retrieve a paginated list of system broadcasts")
+    public Result getBroadcastList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size) {
+        return adminService.getBroadcastList(page, size);
+    }
+
 }

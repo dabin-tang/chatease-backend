@@ -37,7 +37,10 @@ public class JwtInterceptor implements HandlerInterceptor {
             "/files/**",
 
             "/api/app-version/latest",
-            "/ws/**"
+            "/ws/**",
+
+            "/admin/**",
+            "/upload"
     };
 
     @Override
@@ -51,8 +54,16 @@ public class JwtInterceptor implements HandlerInterceptor {
         }
         //Skip JWT check for excluded paths
         for (String path : EXCLUDE_PATHS) {
-            if (requestURI.startsWith(path)) {
-                return true;
+            if (path.endsWith("/**")) {
+                // Remove the "/**" suffix to get the prefix (e.g., "/admin/**" -> "/admin")
+                String prefix = path.substring(0, path.length() - 3);
+                if (requestURI.startsWith(prefix)) {
+                    return true;
+                }
+            } else {
+                if (requestURI.equals(path)) {
+                    return true;
+                }
             }
         }
         //Extract Token from header
@@ -80,7 +91,7 @@ public class JwtInterceptor implements HandlerInterceptor {
             response.getWriter().write("{\"code\":401,\"message\":\"Your account has been banned or forced logout.\"}");
             return false;
         }
-        //Store user info in ThreadLocal for current request
+        // Store user info in ThreadLocal for current request
         UserInfoDTO userInfo = jwtUtil.getUserInfoFromToken(token);
         UserContext.setUser(userInfo);
         return true;

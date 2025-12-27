@@ -1,5 +1,6 @@
 package com.dbt.chatease.Service;
 
+import com.dbt.chatease.Entity.SysBroadcast;
 import com.dbt.chatease.Utils.Result;
 
 public interface ChatService {
@@ -10,11 +11,12 @@ public interface ChatService {
 
     /**
      * Get chat history with a specific contact
-     * @param contactId Friend ID or Group ID
+     *
+     * @param contactId   Friend ID or Group ID
      * @param contactType 0 or 1
      * @return List of MessageVO
      */
-    Result getChatHistory(String contactId, Integer contactType);
+    Result getChatHistory(String contactId, Integer contactType, Long lastMessageId);
 
     /**
      * Mark session as read (clear red dot)
@@ -22,4 +24,6 @@ public interface ChatService {
     Result markAsRead(String contactId);
 
     void sendSystemMessage(String senderId, String receiverId, Integer contactType, String content);
+
+    void pushBroadcastToUsersAsync(SysBroadcast broadcast);
 }

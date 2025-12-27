@@ -6,8 +6,8 @@ import lombok.Data;
 @Data
 @Schema(name = "RobotConfigDTO", description = "DTO for updating robot configuration")
 public class RobotConfigDTO {
-    @Schema(description = "Robot Nickname", example = "ChatEase Helper")
-    private String nickname;
+    @Schema(description = "Robot Name", example = "ChatEase Helper")
+    private String name;
 
     @Schema(description = "Robot Avatar URL", example = "https://example.com/robot.png")
     private String avatar;

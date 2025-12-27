@@ -163,7 +163,7 @@ public class AdminServiceImpl implements AdminService {
     public Result updateRobotConfig(RobotConfigDTO dto) {
         log.info("Admin updating robot config: {}", dto);
         //Update ROBOT_NICKNAME
-        updateSingleSetting("ROBOT_NICKNAME", dto.getNickname());
+        updateSingleSetting("ROBOT_NICKNAME", dto.getName());
         //Update ROBOT_AVATAR
         updateSingleSetting("ROBOT_AVATAR", dto.getAvatar());
         //Update ROBOT_WELCOME
@@ -204,8 +204,49 @@ public class AdminServiceImpl implements AdminService {
         broadcast.setFilePath(dto.getFilePath());       //Save file path
         broadcast.setCreateTime(LocalDateTime.now());
         sysBroadcastRepository.save(broadcast);
+        chatService.pushBroadcastToUsersAsync(broadcast);
         return Result.ok("Broadcast sent successfully");
     }
 
+    @Override
+    public Result getRobotConfig() {
+        log.info("Admin is getting robot config");
+        RobotConfigDTO dto = new RobotConfigDTO();
+        //Get settings individually or handle if they don't exist
+        sysSettingRepository.findById("ROBOT_NICKNAME")
+                .ifPresent(s -> dto.setName(s.getSettingValue()));
+        sysSettingRepository.findById("ROBOT_AVATAR")
+                .ifPresent(s -> dto.setAvatar(s.getSettingValue()));
+        sysSettingRepository.findById("ROBOT_WELCOME")
+                .ifPresent(s -> dto.setWelcomeMessage(s.getSettingValue()));
+
+        return Result.ok(dto);
+    }
+
+    @Override
+    public Result getDashboardStats() {
+        log.info("Admin fetching dashboard stats");
+        long userCount = userInfoRepository.count();
+        long groupCount = groupInfoRepository.count();
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("userCount", userCount);
+        stats.put("groupCount", groupCount);
+        return Result.ok(stats);
+    }
+
+    @Override
+    public Result getBroadcastList(Integer page, Integer size) {
+        log.info("Admin fetching broadcast list. Page: {}, Size: {}", page, size);
+        // Create Pageable object (Sort by createTime descending)
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.DESC, "createTime"));
+        Page<SysBroadcast> broadcastPage = sysBroadcastRepository.findAll(pageable);
+        Map<String, Object> result = new HashMap<>();
+        result.put("records", broadcastPage.getContent());
+        result.put("total", broadcastPage.getTotalElements());
+        result.put("current", page);
+        result.put("size", size);
+        result.put("pages", broadcastPage.getTotalPages());
+        return Result.ok(result);
+    }
 
 }

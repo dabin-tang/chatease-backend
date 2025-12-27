@@ -20,4 +20,10 @@ public interface AdminService {
 
     Result sendBroadcast(BroadcastDTO dto);
 
+    Result getRobotConfig();
+
+    Result getDashboardStats();
+
+    Result getBroadcastList(Integer page, Integer size);
+
 }
